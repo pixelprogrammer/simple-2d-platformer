@@ -1,0 +1,6 @@
+.ignore
+
+CMakeFiles/
+
+# the executable
+simple-2d-platformer
