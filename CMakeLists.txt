@@ -4,6 +4,9 @@ project(simple-2d-platformer C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Compile the commands file
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Find raylib
 find_package(raylib QUIET)
 

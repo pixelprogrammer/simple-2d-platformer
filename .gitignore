@@ -1,6 +1,13 @@
 .ignore
 
 CMakeFiles/
+CMakeCache.txt
+MakeFile
+cmake_install.cmake
+compile_commands.json
+
+.ccls-cache/
+.cache/
 
 # the executable
 simple-2d-platformer
