@@ -15,13 +15,14 @@ int screen_width = SCREEN_WIDTH;
 char *screen_title = "Simple 2D Platformer";
 
 int main(void) {
+  bool debugMode = true;
 
   InitWindow(screen_width, screen_height, screen_title);
   SetTargetFPS(60);
 
   // load resources
   Texture2D megaManSprite =
-      LoadTexture("resources/sprites/mega-man-spritesheet-bw.png");
+      LoadTexture("resources/sprites/mega-man-spritesheet.png");
   AnimationTimeline playerAnimations[PLAYER_TOTAL_STATES];
 
   // init resources
@@ -29,7 +30,7 @@ int main(void) {
 
   printf("Player sprite id: [%d]", player.sprite.id);
 
-  Platform platforms[] = {{{0, GROUND_HEIGHT, SCREEN_WIDTH, 100}, GREEN},
+  Platform platforms[] = {{{0, GROUND_HEIGHT, SCREEN_WIDTH, 100}, BROWN},
                           {{200, 450, 150, 20}, BROWN},
                           {{450, 300, 150, 20}, BROWN},
                           {{600, 200, 100, 20}, BROWN},
@@ -53,7 +54,7 @@ int main(void) {
       DrawRectangleRec(platforms[i].rect, platforms[i].color);
     }
 
-    DrawPlayer(player);
+    DrawPlayer(player, debugMode);
     DrawText("Use gamepad D-pad/left stick to move, A button to jump, Left "
              "Trigger to run",
              10, 10, 20, DARKGRAY);

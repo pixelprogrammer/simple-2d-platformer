@@ -12,7 +12,7 @@
 #define JUMP_SPEED -400.0f
 #define MIN_JUMP_SPEED -200.0f
 #define JUMP_RELEASE_FACTOR 0.3f
-#define GRAVITY 800.0f
+#define GRAVITY 400.0f
 
 typedef enum {
     PLAYER_STANDING,
@@ -28,22 +28,30 @@ typedef enum {
 } PlayerState;
 
 typedef struct {
-    Vector2           position;
+    Vector2           position;      // Center position of player
+    Vector2           prevPosition;  // Previous center position
+    Vector2           size;
+    Vector2           origin;
     Vector2           velocity;
-    Rectangle         rect;
+    Rectangle         collisionBox;  // Offset from center position
+    Rectangle         hitBox;        // Offset from center position
     bool              onGround;
     bool              isJumping;
     Color             color;
     Texture2D         sprite;
+    Vector2           spriteOrigin;
     PlayerState       state;
     bool              facingRight;
     AnimationTimeline timelines[PLAYER_TOTAL_STATES];
 } Player;
 
-void              UpdatePlayer(Player *player, float deltaTime);
-void              DrawPlayer(Player player);
-void              MovePlayer(Player *player, Vector2 newPosition);
-void              CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
-Player            CreatePlayer(Texture2D sprite);
+void      UpdatePlayer(Player *player, float deltaTime);
+void      UpdatePlayerState(Player *player, float inputDirection, bool isRunning, bool isShooting);
+void      DrawPlayer(Player player, bool debugMode);
+void      MovePlayer(Player *player, Vector2 newPosition);
+Rectangle GetPlayerPosition(Player *player);
+void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
+Player    CreatePlayer(Texture2D sprite);
 AnimationTimeline GetCurrentAnimationTimeline(Player *player);
+const char       *PlayerStateToString(PlayerState state);
 #endif

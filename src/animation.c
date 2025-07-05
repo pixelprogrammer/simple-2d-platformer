@@ -65,20 +65,9 @@ bool IsAnimationFinished(AnimationTimeline *timeline) {
   return timeline->finished;
 }
 
-// void InitAnimatedSprite(AnimatedSprite *sprite, Texture2D texture,
-//                         int frameWidth, int frameHeight, int frameX,
-//                         int frameY) {
-//   sprite->sprite = texture;
-//   sprite->frameWidth = frameWidth;
-//   sprite->frameHeight = frameHeight;
-//   sprite->framePos.x = frameX;
-//   sprite->framePos.y = frameY;
-//   sprite->facingRight = true;
-//   InitAnimationTimeline(&sprite->timeline, true);
-// }
-
 void DrawAnimatedSprite(Texture2D *sprite, AnimationTimeline *timeline,
-                        Vector2 position, Vector2 size, bool facingRight) {
+                        Vector2 position, Vector2 size, Vector2 origin,
+                        bool facingRight) {
   if (sprite->id == 0) {
     return;
   }
@@ -94,6 +83,5 @@ void DrawAnimatedSprite(Texture2D *sprite, AnimationTimeline *timeline,
 
   Rectangle destRec = {position.x, position.y, size.x, size.y};
 
-  Vector2 origin = {0, 0};
   DrawTexturePro(*sprite, sourceRec, destRec, origin, 0.0f, WHITE);
 }

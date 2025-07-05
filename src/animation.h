@@ -14,6 +14,7 @@ typedef struct {
     AnimationFrame frames[MAX_ANIMATION_FRAMES];
     int            frameCount;
     Rectangle      frame;
+    Vector2        position;
     int            frameGap;
     bool           loop;
     bool           finished;
@@ -27,18 +28,11 @@ void PlayAnimationTimeline(AnimationTimeline *timeline, float deltaTime);
 void ResetAnimationTimeline(AnimationTimeline *timeline);
 int  GetCurrentAnimationFrame(AnimationTimeline *timeline);
 bool IsAnimationFinished(AnimationTimeline *timeline);
-
-// void InitAnimatedSprite(AnimatedSprite *sprite,
-//                         Texture2D       texture,
-//                         int             frameWidth,
-//                         int             frameHeight,
-//                         int             frameX,
-//                         int             frameY);
-// void UpdateAnimatedSprite(AnimatedSprite *sprite, float deltaTime);
 void DrawAnimatedSprite(Texture2D         *sprite,
                         AnimationTimeline *timeline,
                         Vector2            position,
                         Vector2            size,
+                        Vector2            origin,
                         bool               facingRight);
 
 #endif

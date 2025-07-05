@@ -3,40 +3,74 @@
 #include "animation.h"
 #include <math.h>
 #include <raylib.h>
+#include <stdio.h>
+
+Vector2 PLAYER_SIZE = {22, 24};
 
 void MovePlayer(Player *player, Vector2 newPosition) {
   player->position.x += newPosition.x;
   player->position.y += newPosition.y;
-  player->rect.x = player->position.x;
-  player->rect.y = player->position.y;
 }
 
 AnimationTimeline GetCurrentAnimationTimeline(Player *player) {
   return player->timelines[player->state];
 }
 
-void DrawPlayer(Player player) {
+void DrawPlayer(Player player, bool debugMode) {
   if (player.sprite.id != 0) {
     AnimationTimeline timeline = GetCurrentAnimationTimeline(&player);
+    Vector2 size = {timeline.frame.width, timeline.frame.height};
+    Vector2 drawPosition = {player.position.x + timeline.position.x,
+                            player.position.y + timeline.position.y};
+    Vector2 origin = (Vector2){timeline.frame.width / 2 + timeline.position.x,
+                               timeline.frame.height / 2 + timeline.position.y};
 
-    Vector2 size = {player.rect.width, player.rect.height};
-
-    DrawAnimatedSprite(&player.sprite, &timeline, player.position, size,
+    DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
                        player.facingRight);
-    // int currentFrame = GetCurrentAnimationFrame(&timeline);
-    //
-    // Rectangle sourceRec = {
-    //     currentFrame * timeline.frame.width + timeline.frame.x,
-    //     timeline.frame.y,
-    //     player.facingRight ? timeline.frame.width : -timeline.frame.width,
-    //     timeline.frame.height};
-    // Rectangle destRec = {player.position.x, player.position.y,
-    //                      player.rect.width, player.rect.height};
-    // Vector2 origin = {0, 0};
-    // DrawTexturePro(player.sprite, sourceRec, destRec, origin, 0.0f, WHITE);
   } else {
-    DrawRectangleRec(player.rect, player.color);
+    Vector2 drawPosition = {player.position.x - player.size.x / 2,
+                            player.position.y - player.size.y / 2};
+    Rectangle playerRect = {drawPosition.x, drawPosition.y, player.size.x,
+                            player.size.y};
+    DrawRectangleRec(playerRect, player.color);
   }
+
+  if (debugMode) {
+    // Rectangle hitBoxRect = {player.position.x + player.hitBox.x,
+    //                         player.position.y + player.hitBox.y,
+    //                         player.hitBox.width, player.hitBox.height};
+    // DrawRectangleLinesEx(hitBoxRect, 1.0f, RED);
+
+    Rectangle collisionBoxRect = GetPlayerPosition(&player);
+
+    DrawRectangleLinesEx(collisionBoxRect, 1.0f, GREEN);
+    DrawCircle(collisionBoxRect.x + collisionBoxRect.width / 2,
+               collisionBoxRect.y + collisionBoxRect.height / 2, 2, RED);
+  }
+}
+
+void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
+                       bool isShooting) {
+  PlayerState newState = player->state;
+
+  if (!player->onGround) {
+    newState = isShooting ? PLAYER_JUMPING_SHOOTING : PLAYER_JUMPING;
+  } else if (fabs(inputDirection) > 0.1f) {
+    if (isRunning) {
+      newState = isShooting ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
+    } else {
+      newState = isShooting ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
+    }
+  } else {
+    newState = isShooting ? PLAYER_STANDING_SHOOTING : PLAYER_STANDING;
+  }
+
+  if (newState != player->state) {
+    player->state = newState;
+    ResetAnimationTimeline(&player->timelines[player->state]);
+  }
+
+  printf("Player State [%s]", PlayerStateToString(player->state));
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
@@ -68,6 +102,9 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   bool isRunning = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+
+  bool isShooting = IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
+                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP);
 
   float maxSpeed = isRunning ? PLAYER_RUN_SPEED : PLAYER_SPEED;
 
@@ -119,110 +156,122 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   player->velocity.y += GRAVITY * deltaTime;
 
-  // if (player->sprite.id != 0 && player->totalFrames > 1) {
-  //   player->frameTimer += deltaTime;
-  //   if (player->frameTimer >= player->frameSpeed) {
-  //     player->currentFrame++;
-  //     if (player->currentFrame >= player->totalFrames) {
-  //       player->currentFrame = 0;
-  //     }
-  //     player->frameTimer = 0.0f;
-  //   }
-  // }
-
   Vector2 moveVelocity = {player->velocity.x * deltaTime,
                           player->velocity.y * deltaTime};
   MovePlayer(player, moveVelocity);
 
-  // player->position.x += player->velocity.x * deltaTime;
-  // player->position.y += player->velocity.y * deltaTime;
-  //
-  // player->rect.x = player->position.x;
-  // player->rect.y = player->position.y;
+  // keep player within screen bounds
+  if (player->position.x + player->collisionBox.x < 0) {
+    player->position.x = -player->collisionBox.x;
+  }
+  if (player->position.x + player->collisionBox.x + player->collisionBox.width >
+      screen_width) {
+    player->position.x =
+        screen_width - player->collisionBox.x - player->collisionBox.width;
+  }
 
-  if (player->position.x < 0) {
-    player->position.x = 0;
-    player->rect.x = 0;
-  }
-  if (player->position.x > screen_width - player->rect.width) {
-    player->position.x = screen_width - player->rect.width;
-    player->rect.x = screen_width - player->rect.width;
-  }
+  UpdatePlayerState(player, inputDirection, isRunning, isShooting);
 
   PlayAnimationTimeline(&player->timelines[player->state], deltaTime);
 
   player->onGround = false;
 }
 
+Rectangle GetPlayerPosition(Player *player) {
+  return (Rectangle){player->position.x + player->collisionBox.x,
+                     player->position.y + player->collisionBox.y,
+                     player->collisionBox.width, player->collisionBox.height};
+}
+
 void CheckPlayerCollisions(Player *player, Platform platforms[],
                            int platformCount) {
+  Rectangle playerRect = GetPlayerPosition(player);
   for (int i = 0; i < platformCount; i++) {
-    if (CheckCollisionRecs(player->rect, platforms[i].rect)) {
+    if (CheckCollisionRecs(playerRect, platforms[i].rect)) {
 
       // Calculate overlap amounts
       float overlapLeft =
-          (player->rect.x + player->rect.width) - platforms[i].rect.x;
+          (playerRect.x + playerRect.width) - platforms[i].rect.x;
       float overlapRight =
-          (platforms[i].rect.x + platforms[i].rect.width) - player->rect.x;
+          (platforms[i].rect.x + platforms[i].rect.width) - playerRect.x;
       float overlapTop =
-          (player->rect.y + player->rect.height) - platforms[i].rect.y;
+          (playerRect.y + playerRect.height) - platforms[i].rect.y;
       float overlapBottom =
-          (platforms[i].rect.y + platforms[i].rect.height) - player->rect.y;
+          (platforms[i].rect.y + platforms[i].rect.height) - playerRect.y;
 
       // Find minimum overlap to determine collision direction
       if (overlapTop < overlapBottom && overlapTop < overlapLeft &&
           overlapTop < overlapRight) {
+        printf("Collision from top");
         // Collision from top (player landing on platform)
         if (player->velocity.y > 0) {
-          player->position.y = platforms[i].rect.y - player->rect.height;
+          player->position.y = platforms[i].rect.y + player->collisionBox.y;
           player->velocity.y = 0;
           player->onGround = true;
           player->isJumping = false;
         }
       } else if (overlapBottom < overlapTop && overlapBottom < overlapLeft &&
                  overlapBottom < overlapRight) {
+        printf("Collision from bottom");
         // Collision from bottom (player hitting platform from below)
         if (player->velocity.y < 0) {
-          player->position.y = platforms[i].rect.y + platforms[i].rect.height;
+          player->position.y = platforms[i].rect.y + platforms[i].rect.height -
+                               player->collisionBox.y;
           player->velocity.y = 0;
         }
       } else if (overlapLeft < overlapRight) {
         // Collision from left (player moving right into platform)
         if (player->velocity.x > 0) {
-          player->position.x = platforms[i].rect.x - player->rect.width;
+          player->position.x = platforms[i].rect.x + player->collisionBox.x;
           player->velocity.x = 0;
         }
       } else {
         // Collision from right (player moving left into platform)
         if (player->velocity.x < 0) {
-          player->position.x = platforms[i].rect.x + platforms[i].rect.width;
+          player->position.x = platforms[i].rect.x + platforms[i].rect.width -
+                               player->collisionBox.x;
           player->velocity.x = 0;
         }
       }
-
-      // Update rect position after collision resolution
-      player->rect.x = player->position.x;
-      player->rect.y = player->position.y;
     }
   }
 }
 
 Player CreatePlayer(Texture2D sprite) {
-  Player player = {.position = {100, 400},
+  Player player = {.position = {111, 412},
+                   .prevPosition = {111, 412},
+                   .size = PLAYER_SIZE,
+                   .origin = {0, 0},
                    .velocity = {0, 0},
-                   .rect = {100, 400, 21, 25},
+                   .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2,
+                                    PLAYER_SIZE.x, PLAYER_SIZE.y},
+                   .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2,
+                              PLAYER_SIZE.x, PLAYER_SIZE.y},
                    .onGround = false,
                    .isJumping = false,
                    .color = BLUE,
                    .sprite = sprite,
                    .timelines = {
                        [PLAYER_STANDING] = {.loop = true,
-                                            .frame = {2, 40, 21, 25},
-                                            .frameGap = 4},
-                       [PLAYER_STANDING_SHOOTING] = {.loop = true},
-                       [PLAYER_JUMPING] = {},
-                       [PLAYER_JUMPING_SHOOTING] = {},
-                       [PLAYER_RUNNING] = {.loop = true},
+                                            .position = {-11, -12},
+                                            .frame = {102, 8, 22, 24},
+                                            .frameGap = 8},
+                       [PLAYER_STANDING_SHOOTING] =
+                           {
+                               .loop = true,
+                           },
+                       [PLAYER_JUMPING] = {.loop = true,
+                                           .position = {-13, -15},
+                                           .frame = {264, 3, 30, 30},
+                                           .frameGap = 0},
+                       [PLAYER_JUMPING_SHOOTING] = {.loop = true,
+                                                    .position = {-13, -15},
+                                                    .frame = {145, 39, 30, 30},
+                                                    .frameGap = 0},
+                       [PLAYER_RUNNING] = {.loop = true,
+                                           .position = {-11, -12},
+                                           .frame = {188, 8, 22, 24},
+                                           .frameGap = 3},
                        [PLAYER_RUNNING_SHOOTING] = {},
                        [PLAYER_SLIDING] = {},
                        [PLAYER_CLIMBING] = {},
@@ -234,8 +283,43 @@ Player CreatePlayer(Texture2D sprite) {
   // Standing and blinking
   AddAnimationFrame(&player.timelines[PLAYER_STANDING], 0, 5);
   AddAnimationFrame(&player.timelines[PLAYER_STANDING], 1, 0.05);
-  AddAnimationFrame(&player.timelines[PLAYER_STANDING], 0, 0.15);
+  AddAnimationFrame(&player.timelines[PLAYER_STANDING], 0, 0.25);
   AddAnimationFrame(&player.timelines[PLAYER_STANDING], 1, 0.05);
 
+  // Running
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 0, 0.25);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1, 0.25);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 2, 0.25);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1, 0.25);
+
+  // Running and Shooting
+
+  // Jumping
+
   return player;
+}
+
+const char *PlayerStateToString(PlayerState state) {
+  switch (state) {
+  case PLAYER_STANDING:
+    return "STANDING";
+  case PLAYER_STANDING_SHOOTING:
+    return "STANDING_SHOOTING";
+  case PLAYER_JUMPING:
+    return "JUMPING";
+  case PLAYER_JUMPING_SHOOTING:
+    return "JUMPING_SHOOTING";
+  case PLAYER_RUNNING:
+    return "RUNNING";
+  case PLAYER_RUNNING_SHOOTING:
+    return "RUNNING_SHOOTING";
+  case PLAYER_SLIDING:
+    return "SLIDING";
+  case PLAYER_CLIMBING:
+    return "CLIMBING";
+  case PLAYER_CLIMBING_SHOOTING:
+    return "CLIMBING_SHOOTING";
+  default:
+    return "UNKNOWN";
+  }
 }
