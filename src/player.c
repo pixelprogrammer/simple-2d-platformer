@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 Vector2 PLAYER_SIZE = {22, 24};
+const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
 
 void MovePlayer(Player *player, Vector2 newPosition) {
   player->position.x += newPosition.x;
@@ -66,11 +67,46 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
   }
 
   if (newState != player->state) {
+    PlayerState oldState = player->state;
+    bool shouldReset = ShouldPlayerResetAnimationTimeline(player, newState);
     player->state = newState;
-    ResetAnimationTimeline(&player->timelines[player->state]);
+
+    if (shouldReset) {
+      ResetAnimationTimeline(&player->timelines[player->state]);
+    } else {
+      CopyPlayerAnimationTimeline(player, newState, oldState);
+    }
   }
 
   printf("Player State [%s]", PlayerStateToString(player->state));
+}
+
+/*
+ * Copies the current frame and current frame time to the new timeline
+ * This is to help maintain similar frames between the two states like running
+ * and running+shooting
+ */
+void CopyPlayerAnimationTimeline(Player *player, PlayerState newState,
+                                 PlayerState oldState) {
+  player->timelines[newState].currentFrameIndex =
+      player->timelines[oldState].currentFrameIndex;
+  player->timelines[newState].currentTime =
+      player->timelines[oldState].currentTime;
+}
+
+bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
+  if (player->state != PLAYER_RUNNING_SHOOTING &&
+      player->state != PLAYER_RUNNING) {
+    return true;
+  }
+
+  // if player is still running but shooting or not shooting, do not reset the
+  // animation timeline so the player maintains their running animation
+  if (newState == PLAYER_RUNNING_SHOOTING || newState == PLAYER_RUNNING) {
+    return false;
+  }
+
+  return true;
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
@@ -186,6 +222,8 @@ Rectangle GetPlayerPosition(Player *player) {
 void CheckPlayerCollisions(Player *player, Platform platforms[],
                            int platformCount) {
   Rectangle playerRect = GetPlayerPosition(player);
+  static int groundedPlatformIndex = -1;
+
   for (int i = 0; i < platformCount; i++) {
     if (CheckCollisionRecs(playerRect, platforms[i].rect)) {
 
@@ -202,17 +240,16 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
       // Find minimum overlap to determine collision direction
       if (overlapTop < overlapBottom && overlapTop < overlapLeft &&
           overlapTop < overlapRight) {
-        printf("Collision from top");
         // Collision from top (player landing on platform)
         if (player->velocity.y > 0) {
           player->position.y = platforms[i].rect.y + player->collisionBox.y;
           player->velocity.y = 0;
           player->onGround = true;
           player->isJumping = false;
+          groundedPlatformIndex = i;
         }
       } else if (overlapBottom < overlapTop && overlapBottom < overlapLeft &&
                  overlapBottom < overlapRight) {
-        printf("Collision from bottom");
         // Collision from bottom (player hitting platform from below)
         if (player->velocity.y < 0) {
           player->position.y = platforms[i].rect.y + platforms[i].rect.height -
@@ -235,6 +272,22 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
       }
     }
   }
+
+  // Move player with platform if grounded to a moving platform
+  if (player->onGround && groundedPlatformIndex >= 0 &&
+      groundedPlatformIndex < platformCount) {
+    Platform *groundedPlatform = &platforms[groundedPlatformIndex];
+    if (groundedPlatform->type != PLATFORM_STATIC) {
+      // Move player with the platform
+      player->position.x += groundedPlatform->velocity.x * GetFrameTime();
+      player->position.y += groundedPlatform->velocity.y * GetFrameTime();
+    }
+  }
+
+  // Reset grounded platform if player is no longer on ground
+  if (!player->onGround) {
+    groundedPlatformIndex = -1;
+  }
 }
 
 Player CreatePlayer(Texture2D sprite) {
@@ -254,25 +307,28 @@ Player CreatePlayer(Texture2D sprite) {
                    .timelines = {
                        [PLAYER_STANDING] = {.loop = true,
                                             .position = {-11, -12},
-                                            .frame = {102, 8, 22, 24},
-                                            .frameGap = 8},
-                       [PLAYER_STANDING_SHOOTING] =
-                           {
-                               .loop = true,
-                           },
+                                            .frame = {0, 0, 40, 40},
+                                            .frameGap = 0},
+                       [PLAYER_STANDING_SHOOTING] = {.loop = true,
+                                                     .position = {-11, -12},
+                                                     .frame = {80, 0, 40, 40},
+                                                     .frameGap = 0},
                        [PLAYER_JUMPING] = {.loop = true,
                                            .position = {-13, -15},
-                                           .frame = {264, 3, 30, 30},
+                                           .frame = {0, 120, 40, 40},
                                            .frameGap = 0},
                        [PLAYER_JUMPING_SHOOTING] = {.loop = true,
                                                     .position = {-13, -15},
-                                                    .frame = {145, 39, 30, 30},
+                                                    .frame = {0, 160, 40, 40},
                                                     .frameGap = 0},
                        [PLAYER_RUNNING] = {.loop = true,
-                                           .position = {-11, -12},
-                                           .frame = {188, 8, 22, 24},
-                                           .frameGap = 3},
-                       [PLAYER_RUNNING_SHOOTING] = {},
+                                           .position = {-11, -11},
+                                           .frame = {0, 40, 40, 40},
+                                           .frameGap = 0},
+                       [PLAYER_RUNNING_SHOOTING] = {.loop = true,
+                                                    .position = {-11, -11},
+                                                    .frame = {0, 80, 40, 40},
+                                                    .frameGap = 0},
                        [PLAYER_SLIDING] = {},
                        [PLAYER_CLIMBING] = {},
                        [PLAYER_CLIMBING_SHOOTING] = {},
@@ -286,13 +342,28 @@ Player CreatePlayer(Texture2D sprite) {
   AddAnimationFrame(&player.timelines[PLAYER_STANDING], 0, 0.25);
   AddAnimationFrame(&player.timelines[PLAYER_STANDING], 1, 0.05);
 
+  // Standing and Shooting
+  AddAnimationFrame(&player.timelines[PLAYER_STANDING_SHOOTING], 0, 0);
+
   // Running
-  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 0, 0.25);
-  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1, 0.25);
-  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 2, 0.25);
-  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1, 0.25);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 0,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 2,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING], 1,
+                    PLAYER_RUNNING_FRAME_DURATION);
 
   // Running and Shooting
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 0,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 1,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 2,
+                    PLAYER_RUNNING_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 1,
+                    PLAYER_RUNNING_FRAME_DURATION);
 
   // Jumping
 

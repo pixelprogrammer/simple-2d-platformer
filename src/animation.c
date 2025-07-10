@@ -75,8 +75,7 @@ void DrawAnimatedSprite(Texture2D *sprite, AnimationTimeline *timeline,
   int currentFrame = GetCurrentAnimationFrame(timeline);
 
   Rectangle sourceRec = {
-      (currentFrame * timeline->frame.width) +
-          (currentFrame * timeline->frameGap) + timeline->frame.x,
+      (currentFrame * timeline->frame.width) + timeline->frame.x,
       timeline->frame.y,
       facingRight ? timeline->frame.width : -timeline->frame.width,
       timeline->frame.height};

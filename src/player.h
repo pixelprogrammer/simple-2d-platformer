@@ -53,5 +53,7 @@ Rectangle GetPlayerPosition(Player *player);
 void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
 Player    CreatePlayer(Texture2D sprite);
 AnimationTimeline GetCurrentAnimationTimeline(Player *player);
-const char       *PlayerStateToString(PlayerState state);
+bool              ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState);
+void        CopyPlayerAnimationTimeline(Player *player, PlayerState newState, PlayerState oldState);
+const char *PlayerStateToString(PlayerState state);
 #endif
