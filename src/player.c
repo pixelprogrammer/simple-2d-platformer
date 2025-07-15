@@ -3,9 +3,13 @@
 #include "animation.h"
 #include <math.h>
 #include <raylib.h>
-#include <stdio.h>
 
 Vector2 PLAYER_SIZE = {22, 24};
+
+Vector3 PLAYER_PRIMARY_COLOR = (Vector3){0.0f, 0.45f, 0.95f};
+Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
+float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
+
 const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
 
 void MovePlayer(Player *player, Vector2 newPosition) {
@@ -26,8 +30,57 @@ void DrawPlayer(Player player, bool debugMode) {
     Vector2 origin = (Vector2){timeline.frame.width / 2 + timeline.position.x,
                                timeline.frame.height / 2 + timeline.position.y};
 
+    if (player.colorMode != COLOR_NORMAL && player.colorShader.id != 0) {
+      BeginShaderMode(player.colorShader);
+
+      Vector3 primaryTintColor;
+      Vector3 secondaryTintColor;
+
+      switch (player.colorMode) {
+      case COLOR_PINK:
+        primaryTintColor = (Vector3){1.0f, 0.4f, 0.7f};
+        secondaryTintColor = (Vector3){0.0f, 1.0f, 1.0f};
+        break;
+      case COLOR_PURPLE:
+        primaryTintColor = (Vector3){0.6f, 0.2f, 0.8f};
+        secondaryTintColor = (Vector3){1.0f, 0.6f, 1.0f};
+        break;
+      case COLOR_RED:
+        primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
+        secondaryTintColor = (Vector3){0.7f, 0.7f, 0.7f};
+        break;
+      case COLOR_FIRE:
+        primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
+        secondaryTintColor = (Vector3){1.0f, 0.74f, 0.0f};
+        break;
+      default:
+        primaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
+        secondaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
+        break;
+      }
+
+      // set the primary color and primary color target
+      SetShaderValue(player.colorShader, player.primaryTintColorLoc,
+                     &primaryTintColor, SHADER_UNIFORM_VEC3);
+      SetShaderValue(player.colorShader, player.primaryTargetColorLoc,
+                     &PLAYER_PRIMARY_COLOR, SHADER_UNIFORM_VEC3);
+
+      // set the primary color and primary color target
+      SetShaderValue(player.colorShader, player.secondaryTintColorLoc,
+                     &secondaryTintColor, SHADER_UNIFORM_VEC3);
+      SetShaderValue(player.colorShader, player.secondaryTargetColorLoc,
+                     &PLAYER_SECONDARY_COLOR, SHADER_UNIFORM_VEC3);
+
+      SetShaderValue(player.colorShader, player.toleranceLoc,
+                     &PLAYER_SHADER_COLOR_SWAP_TOLERANCE, SHADER_UNIFORM_FLOAT);
+    }
+
     DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
                        player.facingRight);
+
+    if (player.colorMode != COLOR_NORMAL && player.colorShader.id != 0) {
+      EndShaderMode();
+    }
   } else {
     Vector2 drawPosition = {player.position.x - player.size.x / 2,
                             player.position.y - player.size.y / 2};
@@ -77,8 +130,6 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
       CopyPlayerAnimationTimeline(player, newState, oldState);
     }
   }
-
-  printf("Player State [%s]", PlayerStateToString(player->state));
 }
 
 /*
@@ -137,10 +188,15 @@ void UpdatePlayer(Player *player, float deltaTime) {
   }
 
   bool isRunning = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
-                   IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+                   IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP);
 
   bool isShooting = IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
-                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+
+  if (IsKeyPressed(KEY_C) ||
+      IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
+    player->colorMode = (player->colorMode + 1) % COLOR_TOTAL;
+  }
 
   float maxSpeed = isRunning ? PLAYER_RUN_SPEED : PLAYER_SPEED;
 
@@ -304,6 +360,7 @@ Player CreatePlayer(Texture2D sprite) {
                    .isJumping = false,
                    .color = BLUE,
                    .sprite = sprite,
+                   .colorMode = COLOR_NORMAL,
                    .timelines = {
                        [PLAYER_STANDING] = {.loop = true,
                                             .position = {-11, -12},
@@ -366,6 +423,18 @@ Player CreatePlayer(Texture2D sprite) {
                     PLAYER_RUNNING_FRAME_DURATION);
 
   // Jumping
+
+  // load shader values
+  player.colorShader = LoadShader(0, "resources/shaders/color_tint.glsl");
+  player.primaryTintColorLoc =
+      GetShaderLocation(player.colorShader, "primaryTintColor");
+  player.primaryTargetColorLoc =
+      GetShaderLocation(player.colorShader, "primaryTargetColor");
+  player.secondaryTintColorLoc =
+      GetShaderLocation(player.colorShader, "secondaryTintColor");
+  player.secondaryTargetColorLoc =
+      GetShaderLocation(player.colorShader, "secondaryTargetColor");
+  player.toleranceLoc = GetShaderLocation(player.colorShader, "tolerance");
 
   return player;
 }

@@ -27,6 +27,15 @@ typedef enum {
     PLAYER_TOTAL_STATES,
 } PlayerState;
 
+typedef enum {
+    COLOR_NORMAL,
+    COLOR_PINK,
+    COLOR_PURPLE,
+    COLOR_RED,
+    COLOR_FIRE,
+    COLOR_TOTAL
+} PlayerColorMode;
+
 typedef struct {
     Vector2           position;      // Center position of player
     Vector2           prevPosition;  // Previous center position
@@ -43,6 +52,13 @@ typedef struct {
     PlayerState       state;
     bool              facingRight;
     AnimationTimeline timelines[PLAYER_TOTAL_STATES];
+    PlayerColorMode   colorMode;
+    Shader            colorShader;
+    int               primaryTintColorLoc;
+    int               secondaryTintColorLoc;
+    int               primaryTargetColorLoc;
+    int               secondaryTargetColorLoc;
+    int               toleranceLoc;
 } Player;
 
 void      UpdatePlayer(Player *player, float deltaTime);

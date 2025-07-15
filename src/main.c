@@ -99,8 +99,8 @@ int main(int argc, char *argv[]) {
     float deltaTime = GetFrameTime();
 
     // Systems functions
-    UpdatePlatforms(platforms, platformCount, deltaTime);
     UpdatePlayer(&player, deltaTime);
+    UpdatePlatforms(platforms, platformCount, deltaTime);
     CheckPlayerCollisions(&player, platforms, platformCount);
 
     // Rendering functions
@@ -113,11 +113,12 @@ int main(int argc, char *argv[]) {
     }
 
     DrawPlayer(player, debugMode);
-    DrawText("Use gamepad D-pad/left stick to move, A button to jump, Left "
-             "Trigger to run",
+    DrawText("Use gamepad D-pad/left stick to move, A button to jump, Y "
+             "button to run and X button to shoot",
              10, 10, 20, DARKGRAY);
-    DrawText("Keyboard: Arrow keys to move, Space to jump, Shift to run", 10,
-             35, 20, DARKGRAY);
+    DrawText("Keyboard: Arrow keys to move, Space to jump, Shift to run, C to "
+             "cycle colors",
+             10, 35, 20, DARKGRAY);
 
     EndDrawing();
   }

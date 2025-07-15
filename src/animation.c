@@ -30,8 +30,6 @@ void PlayAnimationTimeline(AnimationTimeline *timeline, float deltaTime) {
   timeline->currentTime += deltaTime;
 
   AnimationFrame currentFrame = timeline->frames[timeline->currentFrameIndex];
-  printf("Playing animation, current frame: [%d], currentFrameTime: [%f]\n",
-         currentFrame.id, timeline->currentTime);
 
   if (timeline->currentTime >= currentFrame.duration) {
     timeline->currentTime -= currentFrame.duration;
