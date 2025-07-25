@@ -1,4 +1,5 @@
 #include "animation.h"
+#include "healthbar.h"
 #include "raylib.h"
 #include <stdio.h>
 #include <string.h>
@@ -36,7 +37,8 @@ int main(int argc, char *argv[]) {
 
   // init resources
   Player player = CreatePlayer(megaManSprite);
-
+  HealthBar playerHealthbar = CreateHealthBar((Vector2){50, 100}, 28, 6, 2);
+  UpdateHealthBar(&playerHealthbar, 5);
   printf("Player sprite id: [%d]", player.sprite.id);
 
   Platform platforms[] = {// Static ground platform
@@ -113,6 +115,8 @@ int main(int argc, char *argv[]) {
     }
 
     DrawPlayer(player, debugMode);
+    DrawHealthBar(playerHealthbar);
+
     DrawText("Use gamepad D-pad/left stick to move, A button to jump, Y "
              "button to run and X button to shoot",
              10, 10, 20, DARKGRAY);
