@@ -7,6 +7,17 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Compile the commands file
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Set default build type to Debug if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+
+# Set build type specific flags
+set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG -Wall -Wextra")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -DRELEASE")
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 # Find raylib
 find_package(raylib QUIET)
 

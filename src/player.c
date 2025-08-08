@@ -1,6 +1,8 @@
 #include "./player.h"
 #include "./screen.c"
 #include "animation.h"
+#include "healthbar.h"
+#include "weapons.h"
 #include <math.h>
 #include <raylib.h>
 
@@ -11,6 +13,8 @@ Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
 float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
 
 const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
+
+const int GAMEPAD_ID = 1;
 
 void MovePlayer(Player *player, Vector2 newPosition) {
   player->position.x += newPosition.x;
@@ -29,27 +33,32 @@ void DrawPlayer(Player player, bool debugMode) {
                             player.position.y + timeline.position.y};
     Vector2 origin = (Vector2){timeline.frame.width / 2 + timeline.position.x,
                                timeline.frame.height / 2 + timeline.position.y};
+    bool useShader = false;
+    if (player.currentWeapon != WEAPON_DEFAULT && player.colorShader.id != 0) {
+      useShader = true;
+    }
 
-    if (player.colorMode != COLOR_NORMAL && player.colorShader.id != 0) {
+    if (useShader) {
       BeginShaderMode(player.colorShader);
 
       Vector3 primaryTintColor;
       Vector3 secondaryTintColor;
 
-      switch (player.colorMode) {
-      case COLOR_PINK:
+      switch (player.currentWeapon) {
+      case WEAPON_LAZER:
         primaryTintColor = (Vector3){1.0f, 0.4f, 0.7f};
         secondaryTintColor = (Vector3){0.0f, 1.0f, 1.0f};
         break;
-      case COLOR_PURPLE:
+      case WEAPON_SPARK:
         primaryTintColor = (Vector3){0.6f, 0.2f, 0.8f};
         secondaryTintColor = (Vector3){1.0f, 0.6f, 1.0f};
         break;
-      case COLOR_RED:
+      case WEAPON_RUSH_JET:
+      case WEAPON_RUSH_JUMP:
         primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
         secondaryTintColor = (Vector3){0.7f, 0.7f, 0.7f};
         break;
-      case COLOR_FIRE:
+      case WEAPON_FIRE:
         primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
         secondaryTintColor = (Vector3){1.0f, 0.74f, 0.0f};
         break;
@@ -78,7 +87,7 @@ void DrawPlayer(Player player, bool debugMode) {
     DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
                        player.facingRight);
 
-    if (player.colorMode != COLOR_NORMAL && player.colorShader.id != 0) {
+    if (useShader) {
       EndShaderMode();
     }
   } else {
@@ -161,21 +170,21 @@ bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
-  bool gamepadConnected = IsGamepadAvailable(0);
+  bool gamepadConnected = IsGamepadAvailable(GAMEPAD_ID);
   float inputDirection = 0.0f;
 
   if (gamepadConnected) {
-    float axisX = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
+    float axisX = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X);
     if (fabs(axisX) > 0.1f) {
       inputDirection = axisX;
     }
 
-    if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
-        GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.1f) {
+    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
+        GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X) < -0.1f) {
       inputDirection = -1.0f;
     }
-    if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
-        GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.1f) {
+    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
+        GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X) > 0.1f) {
       inputDirection = 1.0f;
     }
   }
@@ -187,15 +196,19 @@ void UpdatePlayer(Player *player, float deltaTime) {
     inputDirection = 1.0f;
   }
 
-  bool isRunning = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
-                   IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+  bool isRunning =
+      IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
+      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_UP);
 
-  bool isShooting = IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
-                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+  bool isShooting =
+      IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
+      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 
+  // change weapon/colormode
+  // TODO: Change weapon
   if (IsKeyPressed(KEY_C) ||
-      IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-    player->colorMode = (player->colorMode + 1) % COLOR_TOTAL;
+      IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
+    ChangeNextWeapon(player);
   }
 
   float maxSpeed = isRunning ? PLAYER_RUN_SPEED : PLAYER_SPEED;
@@ -223,16 +236,18 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   bool jumpKeyPressed =
       IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
-      IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-  bool jumpKeyDown = IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) ||
-                     IsKeyDown(KEY_W) ||
-                     IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+      IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+  bool jumpKeyDown =
+      IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
+      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 
   if (gamepadConnected) {
-    jumpKeyPressed = jumpKeyPressed ||
-                     IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+    jumpKeyPressed =
+        jumpKeyPressed ||
+        IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
     jumpKeyDown =
-        jumpKeyDown || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+        jumpKeyDown ||
+        IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
   }
 
   if (jumpKeyPressed && player->onGround) {
@@ -347,50 +362,55 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
 }
 
 Player CreatePlayer(Texture2D sprite) {
-  Player player = {.position = {111, 412},
-                   .prevPosition = {111, 412},
-                   .size = PLAYER_SIZE,
-                   .origin = {0, 0},
-                   .velocity = {0, 0},
-                   .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2,
-                                    PLAYER_SIZE.x, PLAYER_SIZE.y},
-                   .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2,
-                              PLAYER_SIZE.x, PLAYER_SIZE.y},
-                   .onGround = false,
-                   .isJumping = false,
-                   .color = BLUE,
-                   .sprite = sprite,
-                   .colorMode = COLOR_NORMAL,
-                   .timelines = {
-                       [PLAYER_STANDING] = {.loop = true,
-                                            .position = {-11, -12},
-                                            .frame = {0, 0, 40, 40},
-                                            .frameGap = 0},
-                       [PLAYER_STANDING_SHOOTING] = {.loop = true,
-                                                     .position = {-11, -12},
-                                                     .frame = {80, 0, 40, 40},
-                                                     .frameGap = 0},
-                       [PLAYER_JUMPING] = {.loop = true,
-                                           .position = {-13, -15},
-                                           .frame = {0, 120, 40, 40},
-                                           .frameGap = 0},
-                       [PLAYER_JUMPING_SHOOTING] = {.loop = true,
-                                                    .position = {-13, -15},
-                                                    .frame = {0, 160, 40, 40},
-                                                    .frameGap = 0},
-                       [PLAYER_RUNNING] = {.loop = true,
-                                           .position = {-11, -11},
-                                           .frame = {0, 40, 40, 40},
-                                           .frameGap = 0},
-                       [PLAYER_RUNNING_SHOOTING] = {.loop = true,
-                                                    .position = {-11, -11},
-                                                    .frame = {0, 80, 40, 40},
-                                                    .frameGap = 0},
-                       [PLAYER_SLIDING] = {},
-                       [PLAYER_CLIMBING] = {},
-                       [PLAYER_CLIMBING_SHOOTING] = {},
+  Player player = {
+      .position = {111, 412},
+      .prevPosition = {111, 412},
+      .size = PLAYER_SIZE,
+      .origin = {0, 0},
+      .velocity = {0, 0},
+      .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
+                       PLAYER_SIZE.y},
+      .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
+                 PLAYER_SIZE.y},
+      .onGround = false,
+      .isJumping = false,
+      .color = BLUE,
+      .sprite = sprite,
+      .currentWeapon = WEAPON_DEFAULT,
+      .weapons = CreateWeaponsArray(),
+      .healthbar = CreateHealthBar(
+          (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
+          PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),
+      .timelines = {
+          [PLAYER_STANDING] = {.loop = true,
+                               .position = {-11, -12},
+                               .frame = {0, 0, 40, 40},
+                               .frameGap = 0},
+          [PLAYER_STANDING_SHOOTING] = {.loop = true,
+                                        .position = {-11, -12},
+                                        .frame = {80, 0, 40, 40},
+                                        .frameGap = 0},
+          [PLAYER_JUMPING] = {.loop = true,
+                              .position = {-13, -15},
+                              .frame = {0, 120, 40, 40},
+                              .frameGap = 0},
+          [PLAYER_JUMPING_SHOOTING] = {.loop = true,
+                                       .position = {-13, -15},
+                                       .frame = {0, 160, 40, 40},
+                                       .frameGap = 0},
+          [PLAYER_RUNNING] = {.loop = true,
+                              .position = {-11, -11},
+                              .frame = {0, 40, 40, 40},
+                              .frameGap = 0},
+          [PLAYER_RUNNING_SHOOTING] = {.loop = true,
+                                       .position = {-11, -11},
+                                       .frame = {0, 80, 40, 40},
+                                       .frameGap = 0},
+          [PLAYER_SLIDING] = {},
+          [PLAYER_CLIMBING] = {},
+          [PLAYER_CLIMBING_SHOOTING] = {},
 
-                   }};
+      }};
 
   // add the frames to each timeline
   // Standing and blinking
@@ -462,4 +482,19 @@ const char *PlayerStateToString(PlayerState state) {
   default:
     return "UNKNOWN";
   }
+}
+
+void ChangeNextWeapon(Player *player) {
+  for (int i = player->currentWeapon + 1; i <= WEAPON_TOTAL; i++) {
+    if (player->weapons[i].active) {
+      player->currentWeapon = i;
+      return;
+    }
+  }
+
+  player->currentWeapon = WEAPON_DEFAULT;
+}
+
+Weapon *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]) {
+  return weapons[player->currentWeapon];
 }

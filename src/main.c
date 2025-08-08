@@ -1,4 +1,3 @@
-#include "animation.h"
 #include "healthbar.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -7,6 +6,7 @@
 #include "./platform.h"
 #include "./player.h"
 #include "./screen.c"
+#include "weapons.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
@@ -33,12 +33,14 @@ int main(int argc, char *argv[]) {
   // load resources
   Texture2D megaManSprite =
       LoadTexture("resources/sprites/mega-man-spritesheet.png");
-  AnimationTimeline playerAnimations[PLAYER_TOTAL_STATES];
 
   // init resources
   Player player = CreatePlayer(megaManSprite);
-  HealthBar playerHealthbar = CreateHealthBar((Vector2){50, 100}, 28, 6, 2);
-  UpdateHealthBar(&playerHealthbar, 5);
+  // add a few weapons
+  player.weapons[WEAPON_FIRE].active = true;
+  player.weapons[WEAPON_SPARK].active = true;
+  player.weapons[WEAPON_RUSH_JET].active = true;
+
   printf("Player sprite id: [%d]", player.sprite.id);
 
   Platform platforms[] = {// Static ground platform
@@ -115,7 +117,10 @@ int main(int argc, char *argv[]) {
     }
 
     DrawPlayer(player, debugMode);
-    DrawHealthBar(playerHealthbar);
+    DrawHealthBar(player.healthbar);
+    if (player.currentWeapon > 0) {
+      DrawHealthBar(player.weapons[player.currentWeapon].healthBar);
+    }
 
     DrawText("Use gamepad D-pad/left stick to move, A button to jump, Y "
              "button to run and X button to shoot",

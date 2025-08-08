@@ -4,6 +4,8 @@
 #include <raylib.h>
 #include "./platform.h"
 #include "./animation.h"
+#include "healthbar.h"
+#include "weapons.h"
 
 #define PLAYER_SPEED 200.0f
 #define PLAYER_RUN_SPEED 350.0f
@@ -13,6 +15,9 @@
 #define MIN_JUMP_SPEED -200.0f
 #define JUMP_RELEASE_FACTOR 0.3f
 #define GRAVITY 400.0f
+#define PLAYER_HEALTHBAR_MAX_HEALTH 28
+#define PLAYER_HEALTHBAR_SEGMENT_WIDTH 6
+#define PLAYER_HEALTHBAR_SEGMENT_HEIGHT 1
 
 typedef enum {
     PLAYER_STANDING,
@@ -52,8 +57,10 @@ typedef struct {
     PlayerState       state;
     bool              facingRight;
     AnimationTimeline timelines[PLAYER_TOTAL_STATES];
-    PlayerColorMode   colorMode;
+    HealthBar         healthbar;
     Shader            colorShader;
+    WeaponType        currentWeapon;
+    Weapon           *weapons;
     int               primaryTintColorLoc;
     int               secondaryTintColorLoc;
     int               primaryTargetColorLoc;
@@ -62,6 +69,7 @@ typedef struct {
 } Player;
 
 void      UpdatePlayer(Player *player, float deltaTime);
+void      UpdatePlayerWeaponHealthbarColor(Player *player);
 void      UpdatePlayerState(Player *player, float inputDirection, bool isRunning, bool isShooting);
 void      DrawPlayer(Player player, bool debugMode);
 void      MovePlayer(Player *player, Vector2 newPosition);
@@ -72,4 +80,8 @@ AnimationTimeline GetCurrentAnimationTimeline(Player *player);
 bool              ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState);
 void        CopyPlayerAnimationTimeline(Player *player, PlayerState newState, PlayerState oldState);
 const char *PlayerStateToString(PlayerState state);
+HealthBar   CreatePlayerWeaponHealthBar();
+Weapon     *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]);
+void        ChangeNextWeapon(Player *player);
+
 #endif

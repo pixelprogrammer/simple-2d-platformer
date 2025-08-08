@@ -12,19 +12,23 @@ HealthBar CreateHealthBar(Vector2 position, int maxHealth, int segmentWidth,
   healthBar.segmentSpacing = 1.0f;
 
   healthBar.borderWidth = 1;
-  healthBar.healthColorLight = (Color){252, 252, 252, 255};
-  healthBar.healthColor = YELLOW;
+  healthBar.healthColorLight = HEALTHBAR_DEFAULT_LIGHT;
+  healthBar.healthColor = HEALTHBAR_DEFAULT;
   healthBar.emptyColor = DARKGRAY;
   healthBar.borderColor = BLACK;
   return healthBar;
 }
 
-void UpdateHealthBar(HealthBar *healthBar, int currentHealth) {
+void SetHealthBar(HealthBar *healthBar, int currentHealth) {
   if (currentHealth < 0)
     currentHealth = 0;
   if (currentHealth > healthBar->maxHealth)
     currentHealth = healthBar->maxHealth;
   healthBar->currentHealth = currentHealth;
+}
+
+void UpdateHealthbar(HealthBar *healthBar, int health) {
+  SetHealthBar(healthBar, healthBar->currentHealth + health);
 }
 
 void DrawHealthBar(HealthBar healthBar) {
@@ -36,12 +40,11 @@ void DrawHealthBar(HealthBar healthBar) {
                 totalHeight, healthBar.borderColor);
 
   for (int i = 0; i < healthBar.currentHealth; i++) {
-    DrawHealthBarSegment(i, totalWidth, totalHeight, healthBar);
+    DrawHealthBarSegment(i, totalHeight, healthBar);
   }
 }
 
-void DrawHealthBarSegment(int value, int totalWidth, int totalHeight,
-                          HealthBar healthBar) {
+void DrawHealthBarSegment(int value, int totalHeight, HealthBar healthBar) {
   int x = healthBar.position.x + 1;
   int y = healthBar.position.y + totalHeight -
           (healthBar.segmentSpacing * (value + 1)) -
