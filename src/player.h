@@ -61,6 +61,7 @@ typedef struct {
     Shader            colorShader;
     WeaponType        currentWeapon;
     Weapon           *weapons;
+    int               gamepadId;
     int               primaryTintColorLoc;
     int               secondaryTintColorLoc;
     int               primaryTargetColorLoc;

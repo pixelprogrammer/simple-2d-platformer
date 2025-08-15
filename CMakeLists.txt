@@ -22,6 +22,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 find_package(raylib QUIET)
 
 if (NOT raylib_FOUND)
+    message("raylib not found")
     # Fetch raylib from GitHub if not found
     include(FetchContent)
     FetchContent_Declare(

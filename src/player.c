@@ -5,6 +5,9 @@
 #include "weapons.h"
 #include <math.h>
 #include <raylib.h>
+#include <stdio.h>
+
+#define MAX_GAMEPADS 4
 
 Vector2 PLAYER_SIZE = {22, 24};
 
@@ -13,8 +16,6 @@ Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
 float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
 
 const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
-
-const int GAMEPAD_ID = 1;
 
 void MovePlayer(Player *player, Vector2 newPosition) {
   player->position.x += newPosition.x;
@@ -170,21 +171,35 @@ bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
-  bool gamepadConnected = IsGamepadAvailable(GAMEPAD_ID);
+  bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
   float inputDirection = 0.0f;
 
+  if (!gamepadConnected) {
+    // try to detect a controller
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+      if (IsGamepadAvailable(i) &&
+          IsGamepadButtonDown(i, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
+        // set the gamepadId
+        player->gamepadId = i;
+        break;
+      }
+    }
+  }
   if (gamepadConnected) {
-    float axisX = GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X);
+    float axisX =
+        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X);
     if (fabs(axisX) > 0.1f) {
       inputDirection = axisX;
     }
 
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
-        GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X) < -0.1f) {
+    if (IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
+        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X) <
+            -0.1f) {
       inputDirection = -1.0f;
     }
-    if (IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
-        GetGamepadAxisMovement(GAMEPAD_ID, GAMEPAD_AXIS_LEFT_X) > 0.1f) {
+    if (IsGamepadButtonDown(player->gamepadId,
+                            GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
+        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X) > 0.1f) {
       inputDirection = 1.0f;
     }
   }
@@ -198,16 +213,17 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   bool isRunning =
       IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
-      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_UP);
 
   bool isShooting =
       IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
-      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 
   // change weapon/colormode
   // TODO: Change weapon
   if (IsKeyPressed(KEY_C) ||
-      IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
+      IsGamepadButtonPressed(player->gamepadId,
+                             GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
     ChangeNextWeapon(player);
   }
 
@@ -236,19 +252,10 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   bool jumpKeyPressed =
       IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
-      IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+      IsGamepadButtonPressed(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
   bool jumpKeyDown =
       IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
-      IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-
-  if (gamepadConnected) {
-    jumpKeyPressed =
-        jumpKeyPressed ||
-        IsGamepadButtonPressed(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-    jumpKeyDown =
-        jumpKeyDown ||
-        IsGamepadButtonDown(GAMEPAD_ID, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-  }
+      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 
   if (jumpKeyPressed && player->onGround) {
     player->velocity.y = JUMP_SPEED;
@@ -378,6 +385,7 @@ Player CreatePlayer(Texture2D sprite) {
       .sprite = sprite,
       .currentWeapon = WEAPON_DEFAULT,
       .weapons = CreateWeaponsArray(),
+      .gamepadId = -1,
       .healthbar = CreateHealthBar(
           (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
           PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),

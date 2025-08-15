@@ -1,6 +1,7 @@
+// override raylib defaults
+
 #include "healthbar.h"
 #include "raylib.h"
-#include <stdio.h>
 #include <string.h>
 
 #include "./platform.h"
@@ -36,12 +37,17 @@ int main(int argc, char *argv[]) {
 
   // init resources
   Player player = CreatePlayer(megaManSprite);
+
   // add a few weapons
   player.weapons[WEAPON_FIRE].active = true;
   player.weapons[WEAPON_SPARK].active = true;
   player.weapons[WEAPON_RUSH_JET].active = true;
 
-  printf("Player sprite id: [%d]", player.sprite.id);
+  // add the 2D camera
+  Camera2D camera = {0};
+  camera.target = (Vector2){player.position.x, player.position.y};
+  camera.zoom = 1.0f;
+  camera.offset = (Vector2){screen_width / 2.0f, screen_height / 2.0f};
 
   Platform platforms[] = {// Static ground platform
                           {{0, GROUND_HEIGHT, SCREEN_WIDTH, 100},
@@ -101,22 +107,28 @@ int main(int argc, char *argv[]) {
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
+    // Rendering functions
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
 
     // Systems functions
     UpdatePlayer(&player, deltaTime);
     UpdatePlatforms(platforms, platformCount, deltaTime);
     CheckPlayerCollisions(&player, platforms, platformCount);
+    // update camera target
+    camera.target = (Vector2){player.position.x, player.position.y};
 
-    // Rendering functions
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
-
+    // start camera operations
+    BeginMode2D(camera);
     // draw platforms
     for (int i = 0; i < platformCount; i++) {
       DrawRectangleRec(platforms[i].rect, platforms[i].color);
     }
 
     DrawPlayer(player, debugMode);
+    EndMode2D();
+    // end camera mode
+
     DrawHealthBar(player.healthbar);
     if (player.currentWeapon > 0) {
       DrawHealthBar(player.weapons[player.currentWeapon].healthBar);
@@ -128,7 +140,6 @@ int main(int argc, char *argv[]) {
     DrawText("Keyboard: Arrow keys to move, Space to jump, Shift to run, C to "
              "cycle colors",
              10, 35, 20, DARKGRAY);
-
     EndDrawing();
   }
 
