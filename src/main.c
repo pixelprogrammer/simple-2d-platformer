@@ -29,11 +29,13 @@ int main(int argc, char *argv[]) {
   }
 
   InitWindow(screen_width, screen_height, screen_title);
+  InitAudioDevice();
   SetTargetFPS(60);
 
   // load resources
   Texture2D megaManSprite =
       LoadTexture("resources/sprites/mega-man-spritesheet.png");
+  Music music = LoadMusicStream("resources/audio/music_stage_1.mp3");
 
   // init resources
   Player player = CreatePlayer(megaManSprite);
@@ -105,21 +107,28 @@ int main(int argc, char *argv[]) {
 
   int platformCount = sizeof(platforms) / sizeof(platforms[0]);
 
+  PlayMusicStream(music);
+
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
-    // Rendering functions
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
+
+    UpdateMusicStream(music);
 
     // Systems functions
     UpdatePlayer(&player, deltaTime);
     UpdatePlatforms(platforms, platformCount, deltaTime);
     CheckPlayerCollisions(&player, platforms, platformCount);
+
     // update camera target
     camera.target = (Vector2){player.position.x, player.position.y};
 
+    // Rendering functions
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+
     // start camera operations
     BeginMode2D(camera);
+
     // draw platforms
     for (int i = 0; i < platformCount; i++) {
       DrawRectangleRec(platforms[i].rect, platforms[i].color);
@@ -129,6 +138,7 @@ int main(int argc, char *argv[]) {
     EndMode2D();
     // end camera mode
 
+    // Draw UI
     DrawHealthBar(player.healthbar);
     if (player.currentWeapon > 0) {
       DrawHealthBar(player.weapons[player.currentWeapon].healthBar);
@@ -140,9 +150,12 @@ int main(int argc, char *argv[]) {
     DrawText("Keyboard: Arrow keys to move, Space to jump, Shift to run, C to "
              "cycle colors",
              10, 35, 20, DARKGRAY);
+    // End Draw UI
     EndDrawing();
   }
 
+  UnloadMusicStream(music);
+  CloseAudioDevice();
   CloseWindow();
   return 0;
 }

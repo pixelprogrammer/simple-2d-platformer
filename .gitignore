@@ -11,3 +11,6 @@ compile_commands.json
 
 # the executable
 simple-2d-platformer
+
+# No audio resources for now
+resources/audio/*.mp3
