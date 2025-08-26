@@ -38,7 +38,8 @@ pub fn build(b: *std.Build) void {
             "src/healthbar.c",
             "src/platform.c",
             "src/player.c",
-            "src/screen.c",
+            "src/sprite.c",
+            "src/sound.c",
             "src/weapons.c",
         },
         .flags = &flags,
@@ -86,4 +87,3 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the game");
     run_step.dependOn(&run_cmd.step);
 }
-

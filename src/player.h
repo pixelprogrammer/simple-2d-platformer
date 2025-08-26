@@ -51,8 +51,10 @@ typedef struct {
     Rectangle         hitBox;        // Offset from center position
     bool              onGround;
     bool              isJumping;
+    bool              canShoot;
     Color             color;
     Texture2D         sprite;
+    Texture2D         projectileTexture;
     Vector2           spriteOrigin;
     PlayerState       state;
     bool              facingRight;
@@ -61,6 +63,7 @@ typedef struct {
     Shader            colorShader;
     WeaponType        currentWeapon;
     Weapon           *weapons;
+    ProjectileArray   projectiles;
     int               gamepadId;
     int               primaryTintColorLoc;
     int               secondaryTintColorLoc;
@@ -76,7 +79,7 @@ void      DrawPlayer(Player player, bool debugMode);
 void      MovePlayer(Player *player, Vector2 newPosition);
 Rectangle GetPlayerPosition(Player *player);
 void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
-Player    CreatePlayer(Texture2D sprite);
+Player    CreatePlayer(Texture2D sprite, Texture2D projectileTexture);
 AnimationTimeline GetCurrentAnimationTimeline(Player *player);
 bool              ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState);
 void        CopyPlayerAnimationTimeline(Player *player, PlayerState newState, PlayerState oldState);

@@ -6,11 +6,10 @@
 
 #include "./platform.h"
 #include "./player.h"
-#include "./screen.c"
+#include "./screen.h"
+#include "sound.h"
+#include "sprite.h"
 #include "weapons.h"
-
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
 
 #define GROUND_HEIGHT 500
 
@@ -29,16 +28,21 @@ int main(int argc, char *argv[]) {
   }
 
   InitWindow(screen_width, screen_height, screen_title);
-  InitAudioDevice();
+  InitSoundSystem();
   SetTargetFPS(60);
 
   // load resources
   Texture2D megaManSprite =
       LoadTexture("resources/sprites/mega-man-spritesheet.png");
   Music music = LoadMusicStream("resources/audio/music_stage_1.mp3");
+  Texture2D projectileTexture =
+      LoadTexture("resources/sprites/buster-shot.png");
+
+  // load sound effects
+  LoadSoundEffect(SOUND_SHOOT, "resources/audio/sfx-mega-buster.wav");
 
   // init resources
-  Player player = CreatePlayer(megaManSprite);
+  Player player = CreatePlayer(megaManSprite, projectileTexture);
 
   // add a few weapons
   player.weapons[WEAPON_FIRE].active = true;
@@ -114,10 +118,16 @@ int main(int argc, char *argv[]) {
 
     UpdateMusicStream(music);
 
+    // get camera bounds
+    Rectangle bounds = GetBoundsRect(camera);
+
     // Systems functions
     UpdatePlayer(&player, deltaTime);
     UpdatePlatforms(platforms, platformCount, deltaTime);
+    UpdateProjectiles(&player.projectiles, deltaTime);
+
     CheckPlayerCollisions(&player, platforms, platformCount);
+    CheckProjectileCollisions(&player.projectiles, bounds);
 
     // update camera target
     camera.target = (Vector2){player.position.x, player.position.y};
@@ -135,6 +145,14 @@ int main(int argc, char *argv[]) {
     }
 
     DrawPlayer(player, debugMode);
+
+    // draw projectiles
+    if (player.projectiles.length > 0) {
+      for (int i = 0; i < player.projectiles.length; i++) {
+        DrawSprite(player.projectiles.projectiles[i].sprite);
+      }
+    }
+
     EndMode2D();
     // end camera mode
 
@@ -154,7 +172,10 @@ int main(int argc, char *argv[]) {
     EndDrawing();
   }
 
+  // unload
+  DestroySoundSystem();
   UnloadMusicStream(music);
+
   CloseAudioDevice();
   CloseWindow();
   return 0;

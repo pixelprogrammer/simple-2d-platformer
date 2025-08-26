@@ -2,12 +2,13 @@
 #include "./screen.c"
 #include "animation.h"
 #include "healthbar.h"
+#include "sound.h"
 #include "weapons.h"
 #include <math.h>
 #include <raylib.h>
-#include <stdio.h>
 
 #define MAX_GAMEPADS 4
+#define MAX_BUSTER_SHOTS 3
 
 Vector2 PLAYER_SIZE = {22, 24};
 
@@ -35,7 +36,7 @@ void DrawPlayer(Player player, bool debugMode) {
     Vector2 origin = (Vector2){timeline.frame.width / 2 + timeline.position.x,
                                timeline.frame.height / 2 + timeline.position.y};
     bool useShader = false;
-    if (player.currentWeapon != WEAPON_DEFAULT && player.colorShader.id != 0) {
+    if (player.currentWeapon != WEAPON_BUSTER && player.colorShader.id != 0) {
       useShader = true;
     }
 
@@ -170,6 +171,32 @@ bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
   return true;
 }
 
+void ShootWeapon(Player *player) {
+  if (!player->canShoot) {
+    return;
+  }
+
+  if (player->projectiles.length >= MAX_BUSTER_SHOTS) {
+    return;
+  }
+
+  int direction = 1; // facing right
+  if (!player->facingRight) {
+    direction = -1;
+  }
+
+  Vector2 projectilePos = (Vector2){
+      .x = player->position.x + (16 * direction),
+      .y = player->position.y,
+  };
+
+  SpawnProjectile(&player->projectiles, player->projectileTexture,
+                  projectilePos, player->currentWeapon, direction);
+  PlaySoundEffect(SOUND_SHOOT);
+
+  player->canShoot = false; // when the button is released set this to true
+}
+
 void UpdatePlayer(Player *player, float deltaTime) {
   bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
   float inputDirection = 0.0f;
@@ -219,6 +246,10 @@ void UpdatePlayer(Player *player, float deltaTime) {
       IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 
+  if (IsGamepadButtonReleased(player->gamepadId,
+                              GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
+    player->canShoot = true;
+  }
   // change weapon/colormode
   // TODO: Change weapon
   if (IsKeyPressed(KEY_C) ||
@@ -284,6 +315,10 @@ void UpdatePlayer(Player *player, float deltaTime) {
         screen_width - player->collisionBox.x - player->collisionBox.width;
   }
 
+  if (isShooting) {
+    // check if player can shoot
+    ShootWeapon(player);
+  }
   UpdatePlayerState(player, inputDirection, isRunning, isShooting);
 
   PlayAnimationTimeline(&player->timelines[player->state], deltaTime);
@@ -368,7 +403,7 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
   }
 }
 
-Player CreatePlayer(Texture2D sprite) {
+Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
   Player player = {
       .position = {111, 412},
       .prevPosition = {111, 412},
@@ -381,10 +416,13 @@ Player CreatePlayer(Texture2D sprite) {
                  PLAYER_SIZE.y},
       .onGround = false,
       .isJumping = false,
+      .canShoot = true,
       .color = BLUE,
       .sprite = sprite,
-      .currentWeapon = WEAPON_DEFAULT,
+      .projectileTexture = projectileTexture,
+      .currentWeapon = WEAPON_BUSTER,
       .weapons = CreateWeaponsArray(),
+      .projectiles = {.length = 0},
       .gamepadId = -1,
       .healthbar = CreateHealthBar(
           (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
@@ -450,8 +488,6 @@ Player CreatePlayer(Texture2D sprite) {
   AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 1,
                     PLAYER_RUNNING_FRAME_DURATION);
 
-  // Jumping
-
   // load shader values
   player.colorShader = LoadShader(0, "resources/shaders/color_tint.glsl");
   player.primaryTintColorLoc =
@@ -500,7 +536,7 @@ void ChangeNextWeapon(Player *player) {
     }
   }
 
-  player->currentWeapon = WEAPON_DEFAULT;
+  player->currentWeapon = WEAPON_BUSTER;
 }
 
 Weapon *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]) {
