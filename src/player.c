@@ -2,10 +2,12 @@
 #include "./screen.c"
 #include "animation.h"
 #include "healthbar.h"
+#include "screen.h"
 #include "sound.h"
 #include "weapons.h"
 #include <math.h>
 #include <raylib.h>
+#include <stdio.h>
 
 #define MAX_GAMEPADS 4
 #define MAX_BUSTER_SHOTS 3
@@ -18,9 +20,19 @@ float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
 
 const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
 
-void MovePlayer(Player *player, Vector2 newPosition) {
-  player->position.x += newPosition.x;
-  player->position.y += newPosition.y;
+void MovePlayer(Player *player, float deltaTime) {
+  player->position.x += player->velocity.x * deltaTime;
+  player->position.y += player->velocity.y * deltaTime;
+
+  // keep player within screen bounds
+  if (player->position.x + player->collisionBox.x < 0) {
+    player->position.x = -player->collisionBox.x;
+  }
+  if (player->position.x + player->collisionBox.x + player->collisionBox.width >
+      SCREEN_WIDTH) {
+    player->position.x =
+        SCREEN_WIDTH - player->collisionBox.x - player->collisionBox.width;
+  }
 }
 
 AnimationTimeline GetCurrentAnimationTimeline(Player *player) {
@@ -197,6 +209,25 @@ void ShootWeapon(Player *player) {
   player->canShoot = false; // when the button is released set this to true
 }
 
+void HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown,
+                float deltaTime) {
+  if (jumpKeyPressed && player->onGround) {
+    player->velocity.y = JUMP_SPEED;
+    player->isJumping = true;
+  }
+
+  // what is the for exactly?
+  if (player->isJumping && !jumpKeyDown) {
+    player->velocity.y *= JUMP_RELEASE_FACTOR;
+    player->isJumping = false;
+  }
+
+  player->velocity.y += GRAVITY;
+  if (player->velocity.y > MAX_FALL_SPEED) {
+    player->velocity.y = MAX_FALL_SPEED;
+  }
+}
+
 void UpdatePlayer(Player *player, float deltaTime) {
   bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
   float inputDirection = 0.0f;
@@ -238,10 +269,6 @@ void UpdatePlayer(Player *player, float deltaTime) {
     inputDirection = 1.0f;
   }
 
-  bool isRunning =
-      IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) ||
-      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_UP);
-
   bool isShooting =
       IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
@@ -250,6 +277,7 @@ void UpdatePlayer(Player *player, float deltaTime) {
                               GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
     player->canShoot = true;
   }
+
   // change weapon/colormode
   // TODO: Change weapon
   if (IsKeyPressed(KEY_C) ||
@@ -258,28 +286,25 @@ void UpdatePlayer(Player *player, float deltaTime) {
     ChangeNextWeapon(player);
   }
 
-  float maxSpeed = isRunning ? PLAYER_RUN_SPEED : PLAYER_SPEED;
-
   if (inputDirection != 0.0f) {
-    player->velocity.x += inputDirection * PLAYER_ACCELERATION * deltaTime;
+    player->velocity.x = inputDirection * PLAYER_SPEED;
     player->facingRight = (inputDirection > 0);
-
-    if (player->velocity.x > maxSpeed) {
-      player->velocity.x = maxSpeed;
-    } else if (player->velocity.x < -maxSpeed) {
-      player->velocity.x = -maxSpeed;
-    }
   } else {
-    if (player->velocity.x > 0) {
-      player->velocity.x -= PLAYER_FRICTION * deltaTime;
-      if (player->velocity.x < 0)
-        player->velocity.x = 0;
-    } else if (player->velocity.x < 0) {
-      player->velocity.x += PLAYER_FRICTION * deltaTime;
-      if (player->velocity.x > 0)
-        player->velocity.x = 0;
-    }
+    player->velocity.x = 0;
   }
+
+  // NOTE: Friction logic
+  //   else {
+  //   if (player->velocity.x > 0) {
+  //     player->velocity.x -= PLAYER_FRICTION * deltaTime;
+  //     if (player->velocity.x < 0)
+  //       player->velocity.x = 0;
+  //   } else if (player->velocity.x < 0) {
+  //     player->velocity.x += PLAYER_FRICTION * deltaTime;
+  //     if (player->velocity.x > 0)
+  //       player->velocity.x = 0;
+  //   }
+  // }
 
   bool jumpKeyPressed =
       IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
@@ -288,39 +313,14 @@ void UpdatePlayer(Player *player, float deltaTime) {
       IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 
-  if (jumpKeyPressed && player->onGround) {
-    player->velocity.y = JUMP_SPEED;
-    player->isJumping = true;
-  }
-
-  if (player->isJumping && !jumpKeyDown &&
-      player->velocity.y < MIN_JUMP_SPEED) {
-    player->velocity.y *= JUMP_RELEASE_FACTOR;
-    player->isJumping = false;
-  }
-
-  player->velocity.y += GRAVITY * deltaTime;
-
-  Vector2 moveVelocity = {player->velocity.x * deltaTime,
-                          player->velocity.y * deltaTime};
-  MovePlayer(player, moveVelocity);
-
-  // keep player within screen bounds
-  if (player->position.x + player->collisionBox.x < 0) {
-    player->position.x = -player->collisionBox.x;
-  }
-  if (player->position.x + player->collisionBox.x + player->collisionBox.width >
-      screen_width) {
-    player->position.x =
-        screen_width - player->collisionBox.x - player->collisionBox.width;
-  }
+  HandleJump(player, jumpKeyPressed, jumpKeyDown, deltaTime);
+  MovePlayer(player, deltaTime);
 
   if (isShooting) {
     // check if player can shoot
     ShootWeapon(player);
   }
-  UpdatePlayerState(player, inputDirection, isRunning, isShooting);
-
+  UpdatePlayerState(player, inputDirection, false, isShooting);
   PlayAnimationTimeline(&player->timelines[player->state], deltaTime);
 
   player->onGround = false;

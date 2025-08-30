@@ -7,14 +7,16 @@
 #include "healthbar.h"
 #include "weapons.h"
 
-#define PLAYER_SPEED 200.0f
+#define PLAYER_SPEED 82.5f
 #define PLAYER_RUN_SPEED 350.0f
 #define PLAYER_ACCELERATION 800.0f
 #define PLAYER_FRICTION 600.0f
-#define JUMP_SPEED -400.0f
+// -285 is the default but with the gravity pull down we add the gravity 15
+#define JUMP_SPEED -307.5f
 #define MIN_JUMP_SPEED -200.0f
 #define JUMP_RELEASE_FACTOR 0.3f
-#define GRAVITY 400.0f
+#define GRAVITY 15.0f
+#define MAX_FALL_SPEED 420.0f
 #define PLAYER_HEALTHBAR_MAX_HEALTH 28
 #define PLAYER_HEALTHBAR_SEGMENT_WIDTH 6
 #define PLAYER_HEALTHBAR_SEGMENT_HEIGHT 1
@@ -76,7 +78,8 @@ void      UpdatePlayer(Player *player, float deltaTime);
 void      UpdatePlayerWeaponHealthbarColor(Player *player);
 void      UpdatePlayerState(Player *player, float inputDirection, bool isRunning, bool isShooting);
 void      DrawPlayer(Player player, bool debugMode);
-void      MovePlayer(Player *player, Vector2 newPosition);
+void      MovePlayer(Player *player, float deltaTime);
+void      HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown, float deltaTime);
 Rectangle GetPlayerPosition(Player *player);
 void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
 Player    CreatePlayer(Texture2D sprite, Texture2D projectileTexture);

@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
   // add the 2D camera
   Camera2D camera = {0};
   camera.target = (Vector2){player.position.x, player.position.y};
-  camera.zoom = 1.0f;
+  camera.zoom = 4.0f;
   camera.offset = (Vector2){screen_width / 2.0f, screen_height / 2.0f};
 
   Platform platforms[] = {// Static ground platform
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
 
   int platformCount = sizeof(platforms) / sizeof(platforms[0]);
 
-  PlayMusicStream(music);
+  // PlayMusicStream(music);
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();

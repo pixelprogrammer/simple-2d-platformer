@@ -1,0 +1,7 @@
+#ifndef TERMINAL_H
+#define TERMINAL_H
+
+#define TERMINAL_COLOR_RESET "\033[0m"
+#define TERMINAL_COLOR_RED(string) "\033[31m" string TERMINAL_COLOR_RESET
+#define TERMINAL_COLOR_GREEN(string) "\033[92m" string TERMINAL_COLOR_RESET
+#endif  // !TERMINAL_H

@@ -86,4 +86,64 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the game");
     run_step.dependOn(&run_cmd.step);
+
+    // Create test executable
+    const test_exe = b.addExecutable(.{
+        .name = "test_player_jump",
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Add test C files
+    test_exe.addCSourceFiles(.{
+        .files = &.{
+            "tests/test_player_jump.c",
+            "src/animation.c",
+            "src/healthbar.c", 
+            "src/platform.c",
+            "src/player.c",
+            "src/sprite.c",
+            "src/sound.c",
+            "src/weapons.c",
+        },
+        .flags = &flags,
+    });
+
+    // Include src directory for tests
+    test_exe.addIncludePath(b.path("src"));
+
+    // Link raylib for tests
+    test_exe.linkSystemLibrary("raylib");
+    test_exe.linkLibC();
+
+    // Platform-specific libraries for tests
+    switch (target.result.os.tag) {
+        .linux => {
+            test_exe.linkSystemLibrary("m");
+            test_exe.linkSystemLibrary("pthread");
+            test_exe.linkSystemLibrary("dl");
+            test_exe.linkSystemLibrary("rt");
+        },
+        .macos => {
+            test_exe.linkFramework("CoreVideo");
+            test_exe.linkFramework("IOKit");
+            test_exe.linkFramework("Cocoa");
+            test_exe.linkFramework("GLUT");
+            test_exe.linkFramework("OpenGL");
+        },
+        .windows => {
+            test_exe.linkSystemLibrary("winmm");
+        },
+        else => {},
+    }
+
+    // Install the test executable
+    b.installArtifact(test_exe);
+
+    // Create test run step
+    const test_run_cmd = b.addRunArtifact(test_exe);
+    test_run_cmd.step.dependOn(b.getInstallStep());
+
+    const test_step = b.step("test", "Run jump mechanics tests");
+    test_step.dependOn(&test_run_cmd.step);
 }
