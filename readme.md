@@ -1,17 +1,17 @@
 # Simple 2D Platformer game
 
-Just a simple platformer
+Just a simple mega man platformer
 
 # Build instructions
 
-## Debug build (default)
+## Build and run game
 
 ```bash
-cmake --build
+zig build run
 ```
 
-## Release build
+# Run tests
 
 ```bash
-cmake -DCMAKE_BUILD_TYPE=Release --build
+zig build test
 ```
