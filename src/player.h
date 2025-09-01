@@ -13,6 +13,8 @@
 #define PLAYER_FRICTION 600.0f
 // -285 is the default but with the gravity pull down we add the gravity 15
 #define JUMP_SPEED -307.5f
+// with normal gravity
+#define JUMP_PEAK_HEIGHT 50.0f
 #define MIN_JUMP_SPEED -200.0f
 #define JUMP_RELEASE_FACTOR 0.3f
 #define GRAVITY 15.0f

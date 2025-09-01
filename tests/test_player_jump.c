@@ -72,11 +72,15 @@ int test_player_jump_height() {
   printf("Gravity: %.1f\n", GRAVITY);
   printf("Jump Duration: %d frames\n", frameCount);
 
+  char buffer[100];
+
   TEST_ASSERT(maxHeight > 0, "Player should jump above initial position");
   TEST_ASSERT(maxHeight < 200,
               "Jump height should be reasonable (less than 200 pixels)");
   TEST_ASSERT(frameCount > 10, "Jump should last more than 10 frames");
-
+  sprintf(buffer, "Jump should reach %f pixels height at frame 20",
+          JUMP_PEAK_HEIGHT);
+  TEST_ASSERT(frames[19].height == JUMP_PEAK_HEIGHT, buffer);
   return 1;
 }
 
