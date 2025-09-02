@@ -130,16 +130,25 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
                        bool isShooting) {
   PlayerState newState = player->state;
 
+  bool isPlayerInShootingState = player->canShoot && isShooting;
+  if (player->shootingStateDelay > 0.0f) {
+    isPlayerInShootingState = true;
+  }
+
   if (!player->onGround) {
-    newState = isShooting ? PLAYER_JUMPING_SHOOTING : PLAYER_JUMPING;
+    newState =
+        isPlayerInShootingState ? PLAYER_JUMPING_SHOOTING : PLAYER_JUMPING;
   } else if (fabs(inputDirection) > 0.1f) {
     if (isRunning) {
-      newState = isShooting ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
+      newState =
+          isPlayerInShootingState ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
     } else {
-      newState = isShooting ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
+      newState =
+          isPlayerInShootingState ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
     }
   } else {
-    newState = isShooting ? PLAYER_STANDING_SHOOTING : PLAYER_STANDING;
+    newState =
+        isPlayerInShootingState ? PLAYER_STANDING_SHOOTING : PLAYER_STANDING;
   }
 
   if (newState != player->state) {
@@ -188,10 +197,6 @@ void ShootWeapon(Player *player) {
     return;
   }
 
-  if (player->projectiles.length >= MAX_BUSTER_SHOTS) {
-    return;
-  }
-
   int direction = 1; // facing right
   if (!player->facingRight) {
     direction = -1;
@@ -207,6 +212,35 @@ void ShootWeapon(Player *player) {
   PlaySoundEffect(SOUND_SHOOT);
 
   player->canShoot = false; // when the button is released set this to true
+  player->shootingStateDelay = PLAYER_SHOOTING_STATE_TIME;
+}
+
+void HandleShooting(Player *player, bool shootButtonDown,
+                    bool shootButtonReleased, float deltaTime) {
+  // update shooting delay
+  if (player->shootingStateDelay > 0.0f) {
+    player->shootingStateDelay -= deltaTime;
+    if (player->shootingStateDelay < 0.0f) {
+      player->shootingStateDelay = 0;
+    }
+  }
+
+  if (shootButtonReleased) {
+    player->canShoot = true;
+  }
+
+  player->canShoot = CanPlayerShoot(player);
+
+  if (!player->canShoot) {
+    return;
+  }
+
+  if (!shootButtonDown) {
+    // no need to do anything else
+    return;
+  }
+
+  ShootWeapon(player);
 }
 
 void HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown,
@@ -228,6 +262,19 @@ void HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown,
   }
 }
 
+bool CanPlayerShoot(Player *player) {
+  if (!player->canShoot) {
+    return false;
+  }
+
+  // check if player has max projectiles
+  if (player->projectiles.length >= MAX_BUSTER_SHOTS) {
+    return false;
+  }
+
+  return true;
+}
+
 void UpdatePlayer(Player *player, float deltaTime) {
   bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
   float inputDirection = 0.0f;
@@ -243,6 +290,7 @@ void UpdatePlayer(Player *player, float deltaTime) {
       }
     }
   }
+
   if (gamepadConnected) {
     float axisX =
         GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X);
@@ -269,14 +317,14 @@ void UpdatePlayer(Player *player, float deltaTime) {
     inputDirection = 1.0f;
   }
 
-  bool isShooting =
-      IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
-      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+  bool shootButtonDown =
+      (IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
+       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT));
 
-  if (IsGamepadButtonReleased(player->gamepadId,
-                              GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
-    player->canShoot = true;
-  }
+  // NOTE: This being before the shooting mechanic might cause some fun things
+  // if multiple buttons can shoot
+  bool shootButtonReleased = IsGamepadButtonReleased(
+      player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
 
   // change weapon/colormode
   // TODO: Change weapon
@@ -313,14 +361,11 @@ void UpdatePlayer(Player *player, float deltaTime) {
       IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 
+  HandleShooting(player, shootButtonDown, shootButtonReleased, deltaTime);
   HandleJump(player, jumpKeyPressed, jumpKeyDown, deltaTime);
   MovePlayer(player, deltaTime);
 
-  if (isShooting) {
-    // check if player can shoot
-    ShootWeapon(player);
-  }
-  UpdatePlayerState(player, inputDirection, false, isShooting);
+  UpdatePlayerState(player, inputDirection, false, shootButtonDown);
   PlayAnimationTimeline(&player->timelines[player->state], deltaTime);
 
   player->onGround = false;
@@ -417,6 +462,7 @@ Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
       .onGround = false,
       .isJumping = false,
       .canShoot = true,
+      .shootingStateDelay = 0.0f,
       .color = BLUE,
       .sprite = sprite,
       .projectileTexture = projectileTexture,

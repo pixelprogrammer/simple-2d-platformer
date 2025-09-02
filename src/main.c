@@ -2,6 +2,7 @@
 
 #include "healthbar.h"
 #include "raylib.h"
+#include <stdio.h>
 #include <string.h>
 
 #include "./platform.h"
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
   // add the 2D camera
   Camera2D camera = {0};
   camera.target = (Vector2){player.position.x, player.position.y};
-  camera.zoom = 4.0f;
+  camera.zoom = 2.0f;
   camera.offset = (Vector2){screen_width / 2.0f, screen_height / 2.0f};
 
   Platform platforms[] = {// Static ground platform
@@ -115,7 +116,7 @@ int main(int argc, char *argv[]) {
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
-
+    printf("Player shooting state delay %f\n", player.shootingStateDelay);
     UpdateMusicStream(music);
 
     // get camera bounds

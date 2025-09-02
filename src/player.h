@@ -19,6 +19,10 @@
 #define JUMP_RELEASE_FACTOR 0.3f
 #define GRAVITY 15.0f
 #define MAX_FALL_SPEED 420.0f
+
+// in seconds
+#define PLAYER_SHOOTING_STATE_TIME 0.3f
+
 #define PLAYER_HEALTHBAR_MAX_HEALTH 28
 #define PLAYER_HEALTHBAR_SEGMENT_WIDTH 6
 #define PLAYER_HEALTHBAR_SEGMENT_HEIGHT 1
@@ -56,6 +60,7 @@ typedef struct {
     bool              onGround;
     bool              isJumping;
     bool              canShoot;
+    float             shootingStateDelay;
     Color             color;
     Texture2D         sprite;
     Texture2D         projectileTexture;
@@ -82,6 +87,10 @@ void      UpdatePlayerState(Player *player, float inputDirection, bool isRunning
 void      DrawPlayer(Player player, bool debugMode);
 void      MovePlayer(Player *player, float deltaTime);
 void      HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown, float deltaTime);
+void      HandleShooting(Player *player,
+                         bool    shootButtonDown,
+                         bool    shootButtonReleased,
+                         float   deltaTime);
 Rectangle GetPlayerPosition(Player *player);
 void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
 Player    CreatePlayer(Texture2D sprite, Texture2D projectileTexture);
@@ -92,5 +101,6 @@ const char *PlayerStateToString(PlayerState state);
 HealthBar   CreatePlayerWeaponHealthBar();
 Weapon     *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]);
 void        ChangeNextWeapon(Player *player);
+bool        CanPlayerShoot(Player *player);
 
 #endif
