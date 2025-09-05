@@ -4,6 +4,7 @@
 #include <raylib.h>
 #include "./platform.h"
 #include "./animation.h"
+#include "enemy.h"
 #include "healthbar.h"
 #include "weapons.h"
 
@@ -20,8 +21,16 @@
 #define GRAVITY 15.0f
 #define MAX_FALL_SPEED 420.0f
 
+#define PLAYER_HURT_SPEED 20.0f
+
+#define PLAYER_FRAME_SIZE 40
+#define PLAYER_RUNNING_FRAME_DURATION 0.25
+#define PLAYER_HURT_FRAME_DURATION 0.1
+#define PLAYER_HURT_INVINCIBILITY_TIME 1.5
+
 // in seconds
 #define PLAYER_SHOOTING_STATE_TIME 0.3f
+#define PLAYER_HURT_STATE_TIME 0.3f
 
 #define PLAYER_HEALTHBAR_MAX_HEALTH 28
 #define PLAYER_HEALTHBAR_SEGMENT_WIDTH 6
@@ -37,6 +46,7 @@ typedef enum {
     PLAYER_SLIDING,
     PLAYER_CLIMBING,
     PLAYER_CLIMBING_SHOOTING,
+    PLAYER_HURT,
     PLAYER_TOTAL_STATES,
 } PlayerState;
 
@@ -61,6 +71,7 @@ typedef struct {
     bool              isJumping;
     bool              canShoot;
     float             shootingStateDelay;
+    float             invincibilityFrameTime;
     Color             color;
     Texture2D         sprite;
     Texture2D         projectileTexture;
@@ -91,6 +102,9 @@ void      HandleShooting(Player *player,
                          bool    shootButtonDown,
                          bool    shootButtonReleased,
                          float   deltaTime);
+void      CheckPlayerHurt(Player *player, Enemy *enemy);
+void      HurtPlayer(Player *player, int damage);
+bool      IsPlayerStunned(Player *player);
 Rectangle GetPlayerPosition(Player *player);
 void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
 Player    CreatePlayer(Texture2D sprite, Texture2D projectileTexture);

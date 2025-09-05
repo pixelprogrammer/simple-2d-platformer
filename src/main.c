@@ -1,5 +1,6 @@
 // override raylib defaults
 
+#include "enemy.h"
 #include "healthbar.h"
 #include "raylib.h"
 #include <stdio.h>
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]) {
   Music music = LoadMusicStream("resources/audio/music_stage_1.mp3");
   Texture2D projectileTexture =
       LoadTexture("resources/sprites/buster-shot.png");
-
+  Texture2D enemySprite;
   // load sound effects
   LoadSoundEffect(SOUND_SHOOT, "resources/audio/sfx-mega-buster.wav");
 
@@ -49,6 +50,12 @@ int main(int argc, char *argv[]) {
   player.weapons[WEAPON_FIRE].active = true;
   player.weapons[WEAPON_SPARK].active = true;
   player.weapons[WEAPON_RUSH_JET].active = true;
+
+  Enemy singleEnemy;
+  InitEnemy(&singleEnemy, (Vector2){100, 100}, enemySprite);
+
+  // enemies
+  Enemy enemies[] = {singleEnemy};
 
   // add the 2D camera
   Camera2D camera = {0};
@@ -116,7 +123,6 @@ int main(int argc, char *argv[]) {
 
   while (!WindowShouldClose()) {
     float deltaTime = GetFrameTime();
-    printf("Player shooting state delay %f\n", player.shootingStateDelay);
     UpdateMusicStream(music);
 
     // get camera bounds
@@ -129,6 +135,11 @@ int main(int argc, char *argv[]) {
 
     CheckPlayerCollisions(&player, platforms, platformCount);
     CheckProjectileCollisions(&player.projectiles, bounds);
+
+    for (int i = 0; i < 1; i++) {
+      UpdateEnemy(&enemies[i], player.position, deltaTime);
+      CheckPlayerHurt(&player, &enemies[i]);
+    }
 
     // update camera target
     camera.target = (Vector2){player.position.x, player.position.y};
@@ -145,7 +156,10 @@ int main(int argc, char *argv[]) {
       DrawRectangleRec(platforms[i].rect, platforms[i].color);
     }
 
-    DrawPlayer(player, debugMode);
+    // draw enemies
+    for (int i = 0; i < 1; i++) {
+      DrawEnemy(enemies[i]);
+    }
 
     // draw projectiles
     if (player.projectiles.length > 0) {
@@ -153,6 +167,8 @@ int main(int argc, char *argv[]) {
         DrawSprite(player.projectiles.projectiles[i].sprite);
       }
     }
+
+    DrawPlayer(player, debugMode);
 
     EndMode2D();
     // end camera mode

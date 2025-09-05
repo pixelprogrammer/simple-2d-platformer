@@ -1,6 +1,7 @@
 #include "./player.h"
 #include "./screen.c"
 #include "animation.h"
+#include "enemy.h"
 #include "healthbar.h"
 #include "screen.h"
 #include "sound.h"
@@ -17,8 +18,6 @@ Vector2 PLAYER_SIZE = {22, 24};
 Vector3 PLAYER_PRIMARY_COLOR = (Vector3){0.0f, 0.45f, 0.95f};
 Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
 float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
-
-const float PLAYER_RUNNING_FRAME_DURATION = 0.25;
 
 void MovePlayer(Player *player, float deltaTime) {
   player->position.x += player->velocity.x * deltaTime;
@@ -129,6 +128,11 @@ void DrawPlayer(Player player, bool debugMode) {
 void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
                        bool isShooting) {
   PlayerState newState = player->state;
+
+  if (player->state == PLAYER_HURT && player->invincibilityFrameTime > 0) {
+    // no need to change state
+    return;
+  }
 
   bool isPlayerInShootingState = player->canShoot && isShooting;
   if (player->shootingStateDelay > 0.0f) {
@@ -276,6 +280,7 @@ bool CanPlayerShoot(Player *player) {
 }
 
 void UpdatePlayer(Player *player, float deltaTime) {
+
   bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
   float inputDirection = 0.0f;
 
@@ -289,6 +294,12 @@ void UpdatePlayer(Player *player, float deltaTime) {
         break;
       }
     }
+  }
+
+  // handle hurt state
+  player->invincibilityFrameTime -= deltaTime;
+  if (player->invincibilityFrameTime < 0) {
+    player->invincibilityFrameTime = 0;
   }
 
   if (gamepadConnected) {
@@ -328,18 +339,9 @@ void UpdatePlayer(Player *player, float deltaTime) {
 
   // change weapon/colormode
   // TODO: Change weapon
-  if (IsKeyPressed(KEY_C) ||
-      IsGamepadButtonPressed(player->gamepadId,
-                             GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-    ChangeNextWeapon(player);
-  }
-
-  if (inputDirection != 0.0f) {
-    player->velocity.x = inputDirection * PLAYER_SPEED;
-    player->facingRight = (inputDirection > 0);
-  } else {
-    player->velocity.x = 0;
-  }
+  bool changeWeapon = IsKeyPressed(KEY_C) ||
+                      IsGamepadButtonPressed(player->gamepadId,
+                                             GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
 
   // NOTE: Friction logic
   //   else {
@@ -361,8 +363,23 @@ void UpdatePlayer(Player *player, float deltaTime) {
       IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 
-  HandleShooting(player, shootButtonDown, shootButtonReleased, deltaTime);
-  HandleJump(player, jumpKeyPressed, jumpKeyDown, deltaTime);
+  if (!IsPlayerStunned(player)) {
+    if (inputDirection != 0.0f) {
+      player->velocity.x = inputDirection * PLAYER_SPEED;
+      player->facingRight = (inputDirection > 0);
+    } else {
+      player->velocity.x = 0;
+    }
+    if (changeWeapon) {
+      ChangeNextWeapon(player);
+    }
+    HandleShooting(player, shootButtonDown, shootButtonReleased, deltaTime);
+    HandleJump(player, jumpKeyPressed, jumpKeyDown, deltaTime);
+  } else {
+
+    HandleJump(player, false, false, deltaTime);
+  }
+
   MovePlayer(player, deltaTime);
 
   UpdatePlayerState(player, inputDirection, false, shootButtonDown);
@@ -449,60 +466,74 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
 }
 
 Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
-  Player player = {
-      .position = {111, 412},
-      .prevPosition = {111, 412},
-      .size = PLAYER_SIZE,
-      .origin = {0, 0},
-      .velocity = {0, 0},
-      .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
-                       PLAYER_SIZE.y},
-      .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
-                 PLAYER_SIZE.y},
-      .onGround = false,
-      .isJumping = false,
-      .canShoot = true,
-      .shootingStateDelay = 0.0f,
-      .color = BLUE,
-      .sprite = sprite,
-      .projectileTexture = projectileTexture,
-      .currentWeapon = WEAPON_BUSTER,
-      .weapons = CreateWeaponsArray(),
-      .projectiles = {.length = 0},
-      .gamepadId = -1,
-      .healthbar = CreateHealthBar(
-          (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
-          PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),
-      .timelines = {
-          [PLAYER_STANDING] = {.loop = true,
-                               .position = {-11, -12},
-                               .frame = {0, 0, 40, 40},
+  Player player =
+      {.position = {111, 412},
+       .prevPosition = {111, 412},
+       .size = PLAYER_SIZE,
+       .origin = {0, 0},
+       .velocity = {0, 0},
+       .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
+                        PLAYER_SIZE.y},
+       .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
+                  PLAYER_SIZE.y},
+       .onGround = false,
+       .isJumping = false,
+       .canShoot = true,
+       .shootingStateDelay = 0.0f,
+       .invincibilityFrameTime = 0.0f,
+       .color = BLUE,
+       .sprite = sprite,
+       .projectileTexture = projectileTexture,
+       .currentWeapon = WEAPON_BUSTER,
+       .weapons = CreateWeaponsArray(),
+       .projectiles = {.length = 0},
+       .gamepadId = -1,
+       .healthbar = CreateHealthBar(
+           (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
+           PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),
+       .timelines = {
+           [PLAYER_STANDING] = {.loop = true,
+                                .position = {-11, -12},
+                                .frame = {0, 0, PLAYER_FRAME_SIZE,
+                                          PLAYER_FRAME_SIZE},
+                                .frameGap = 0},
+           [PLAYER_STANDING_SHOOTING] = {.loop = true,
+                                         .position = {-11, -12},
+                                         .frame = {80, 0, PLAYER_FRAME_SIZE,
+                                                   PLAYER_FRAME_SIZE},
+                                         .frameGap = 0},
+           [PLAYER_RUNNING] = {.loop = true,
+                               .position = {-11, -11},
+                               .frame = {0, 40, PLAYER_FRAME_SIZE,
+                                         PLAYER_FRAME_SIZE},
                                .frameGap = 0},
-          [PLAYER_STANDING_SHOOTING] = {.loop = true,
-                                        .position = {-11, -12},
-                                        .frame = {80, 0, 40, 40},
+           [PLAYER_RUNNING_SHOOTING] = {.loop = true,
+                                        .position = {-11, -11},
+                                        .frame = {0, 80, PLAYER_FRAME_SIZE,
+                                                  PLAYER_FRAME_SIZE},
                                         .frameGap = 0},
-          [PLAYER_JUMPING] = {.loop = true,
-                              .position = {-13, -15},
-                              .frame = {0, 120, 40, 40},
-                              .frameGap = 0},
-          [PLAYER_JUMPING_SHOOTING] = {.loop = true,
-                                       .position = {-13, -15},
-                                       .frame = {0, 160, 40, 40},
-                                       .frameGap = 0},
-          [PLAYER_RUNNING] = {.loop = true,
-                              .position = {-11, -11},
-                              .frame = {0, 40, 40, 40},
-                              .frameGap = 0},
-          [PLAYER_RUNNING_SHOOTING] = {.loop = true,
-                                       .position = {-11, -11},
-                                       .frame = {0, 80, 40, 40},
-                                       .frameGap = 0},
-          [PLAYER_SLIDING] = {},
-          [PLAYER_CLIMBING] = {},
-          [PLAYER_CLIMBING_SHOOTING] = {},
+           [PLAYER_JUMPING] = {.loop = true,
+                               .position = {-13, -15},
+                               .frame = {0, 120, PLAYER_FRAME_SIZE,
+                                         PLAYER_FRAME_SIZE},
+                               .frameGap = 0},
+           [PLAYER_JUMPING_SHOOTING] = {.loop = true,
+                                        .position = {-13, -15},
+                                        .frame = {0, 160, PLAYER_FRAME_SIZE,
+                                                  PLAYER_FRAME_SIZE},
+                                        .frameGap = 0},
+           [PLAYER_CLIMBING] = {},
+           [PLAYER_CLIMBING_SHOOTING] = {},
+           [PLAYER_SLIDING] = {},
+           [PLAYER_HURT] =
+               {
+                   .loop = true,
+                   .position = {-11, -11},
+                   .frame = {0, 320, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                   .frameGap = 0,
+               },
 
-      }};
+       }};
 
   // add the frames to each timeline
   // Standing and blinking
@@ -533,6 +564,12 @@ Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
                     PLAYER_RUNNING_FRAME_DURATION);
   AddAnimationFrame(&player.timelines[PLAYER_RUNNING_SHOOTING], 1,
                     PLAYER_RUNNING_FRAME_DURATION);
+
+  // Getting hit
+  AddAnimationFrame(&player.timelines[PLAYER_HURT], 0,
+                    PLAYER_HURT_FRAME_DURATION);
+  AddAnimationFrame(&player.timelines[PLAYER_HURT], 1,
+                    PLAYER_HURT_FRAME_DURATION);
 
   // load shader values
   player.colorShader = LoadShader(0, "resources/shaders/color_tint.glsl");
@@ -569,9 +606,46 @@ const char *PlayerStateToString(PlayerState state) {
     return "CLIMBING";
   case PLAYER_CLIMBING_SHOOTING:
     return "CLIMBING_SHOOTING";
+  case PLAYER_HURT:
+    return "PLAYER_HURT";
   default:
     return "UNKNOWN";
   }
+}
+
+bool IsPlayerStunned(Player *player) {
+  return player->state == PLAYER_HURT && player->invincibilityFrameTime > 0;
+}
+
+void CheckPlayerHurt(Player *player, Enemy *enemy) {
+
+  if (!enemy->active) {
+    return;
+  }
+
+  Rectangle playerRect = GetPlayerPosition(player);
+
+  if (CheckCollisionRecs(playerRect, enemy->hitbox)) {
+    // change state to hit
+    // TODO: Update damage to enemy damage
+    HurtPlayer(player, 5);
+    enemy->active = false;
+  }
+}
+
+void HurtPlayer(Player *player, int damage) {
+
+  player->state = PLAYER_HURT;
+  SetHealthBar(&player->healthbar, player->healthbar.currentHealth - damage);
+  if (player->healthbar.currentHealth <= 0) {
+    // TODO: Kill MegaMan
+    return;
+  }
+
+  // set the velocity to move the character back and down
+  player->velocity.x = PLAYER_HURT_SPEED;
+  player->velocity.y = 0;
+  player->invincibilityFrameTime = PLAYER_HURT_INVINCIBILITY_TIME;
 }
 
 void ChangeNextWeapon(Player *player) {
