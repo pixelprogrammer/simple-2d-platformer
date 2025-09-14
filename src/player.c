@@ -39,76 +39,92 @@ AnimationTimeline GetCurrentAnimationTimeline(Player *player) {
 }
 
 void DrawPlayer(Player player, bool debugMode) {
-  if (player.sprite.id != 0) {
-    AnimationTimeline timeline = GetCurrentAnimationTimeline(&player);
-    Vector2 size = {timeline.frame.width, timeline.frame.height};
-    Vector2 drawPosition = {player.position.x + timeline.position.x,
-                            player.position.y + timeline.position.y};
-    Vector2 origin = (Vector2){timeline.frame.width / 2 + timeline.position.x,
-                               timeline.frame.height / 2 + timeline.position.y};
-    bool useShader = false;
-    if (player.currentWeapon != WEAPON_BUSTER && player.colorShader.id != 0) {
-      useShader = true;
+  bool shouldDraw = true;
+  if (player.invincibilityTime > 0) {
+    int iFrameTime = player.invincibilityTime * 1000;
+    int iFrame = iFrameTime % 200;
+
+    if (iFrame < 100) {
+      shouldDraw = false;
     }
+  }
 
-    if (useShader) {
-      BeginShaderMode(player.colorShader);
+  if (shouldDraw) {
 
-      Vector3 primaryTintColor;
-      Vector3 secondaryTintColor;
+    if (player.sprite.id != 0) {
 
-      switch (player.currentWeapon) {
-      case WEAPON_LAZER:
-        primaryTintColor = (Vector3){1.0f, 0.4f, 0.7f};
-        secondaryTintColor = (Vector3){0.0f, 1.0f, 1.0f};
-        break;
-      case WEAPON_SPARK:
-        primaryTintColor = (Vector3){0.6f, 0.2f, 0.8f};
-        secondaryTintColor = (Vector3){1.0f, 0.6f, 1.0f};
-        break;
-      case WEAPON_RUSH_JET:
-      case WEAPON_RUSH_JUMP:
-        primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
-        secondaryTintColor = (Vector3){0.7f, 0.7f, 0.7f};
-        break;
-      case WEAPON_FIRE:
-        primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
-        secondaryTintColor = (Vector3){1.0f, 0.74f, 0.0f};
-        break;
-      default:
-        primaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
-        secondaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
-        break;
+      AnimationTimeline timeline = GetCurrentAnimationTimeline(&player);
+      Vector2 size = {timeline.frame.width, timeline.frame.height};
+      Vector2 drawPosition = {player.position.x + timeline.position.x,
+                              player.position.y + timeline.position.y};
+      Vector2 origin =
+          (Vector2){timeline.frame.width / 2 + timeline.position.x,
+                    timeline.frame.height / 2 + timeline.position.y};
+      bool useShader = false;
+      if (player.currentWeapon != WEAPON_BUSTER && player.colorShader.id != 0) {
+        useShader = true;
       }
 
-      // set the primary color and primary color target
-      SetShaderValue(player.colorShader, player.primaryTintColorLoc,
-                     &primaryTintColor, SHADER_UNIFORM_VEC3);
-      SetShaderValue(player.colorShader, player.primaryTargetColorLoc,
-                     &PLAYER_PRIMARY_COLOR, SHADER_UNIFORM_VEC3);
+      if (useShader) {
+        BeginShaderMode(player.colorShader);
 
-      // set the primary color and primary color target
-      SetShaderValue(player.colorShader, player.secondaryTintColorLoc,
-                     &secondaryTintColor, SHADER_UNIFORM_VEC3);
-      SetShaderValue(player.colorShader, player.secondaryTargetColorLoc,
-                     &PLAYER_SECONDARY_COLOR, SHADER_UNIFORM_VEC3);
+        Vector3 primaryTintColor;
+        Vector3 secondaryTintColor;
 
-      SetShaderValue(player.colorShader, player.toleranceLoc,
-                     &PLAYER_SHADER_COLOR_SWAP_TOLERANCE, SHADER_UNIFORM_FLOAT);
+        switch (player.currentWeapon) {
+        case WEAPON_LAZER:
+          primaryTintColor = (Vector3){1.0f, 0.4f, 0.7f};
+          secondaryTintColor = (Vector3){0.0f, 1.0f, 1.0f};
+          break;
+        case WEAPON_SPARK:
+          primaryTintColor = (Vector3){0.6f, 0.2f, 0.8f};
+          secondaryTintColor = (Vector3){1.0f, 0.6f, 1.0f};
+          break;
+        case WEAPON_RUSH_JET:
+        case WEAPON_RUSH_JUMP:
+          primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
+          secondaryTintColor = (Vector3){0.7f, 0.7f, 0.7f};
+          break;
+        case WEAPON_FIRE:
+          primaryTintColor = (Vector3){1.0f, 0.23f, 0.0f};
+          secondaryTintColor = (Vector3){1.0f, 0.74f, 0.0f};
+          break;
+        default:
+          primaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
+          secondaryTintColor = (Vector3){1.0f, 1.0f, 1.0f};
+          break;
+        }
+
+        // set the primary color and primary color target
+        SetShaderValue(player.colorShader, player.primaryTintColorLoc,
+                       &primaryTintColor, SHADER_UNIFORM_VEC3);
+        SetShaderValue(player.colorShader, player.primaryTargetColorLoc,
+                       &PLAYER_PRIMARY_COLOR, SHADER_UNIFORM_VEC3);
+
+        // set the primary color and primary color target
+        SetShaderValue(player.colorShader, player.secondaryTintColorLoc,
+                       &secondaryTintColor, SHADER_UNIFORM_VEC3);
+        SetShaderValue(player.colorShader, player.secondaryTargetColorLoc,
+                       &PLAYER_SECONDARY_COLOR, SHADER_UNIFORM_VEC3);
+
+        SetShaderValue(player.colorShader, player.toleranceLoc,
+                       &PLAYER_SHADER_COLOR_SWAP_TOLERANCE,
+                       SHADER_UNIFORM_FLOAT);
+      }
+
+      DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
+                         player.facingRight);
+
+      if (useShader) {
+        EndShaderMode();
+      }
+    } else {
+      Vector2 drawPosition = {player.position.x - player.size.x / 2,
+                              player.position.y - player.size.y / 2};
+      Rectangle playerRect = {drawPosition.x, drawPosition.y, player.size.x,
+                              player.size.y};
+      DrawRectangleRec(playerRect, player.color);
     }
-
-    DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
-                       player.facingRight);
-
-    if (useShader) {
-      EndShaderMode();
-    }
-  } else {
-    Vector2 drawPosition = {player.position.x - player.size.x / 2,
-                            player.position.y - player.size.y / 2};
-    Rectangle playerRect = {drawPosition.x, drawPosition.y, player.size.x,
-                            player.size.y};
-    DrawRectangleRec(playerRect, player.color);
   }
 
   if (debugMode) {
@@ -129,7 +145,7 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
                        bool isShooting) {
   PlayerState newState = player->state;
 
-  if (player->state == PLAYER_HURT && player->invincibilityFrameTime > 0) {
+  if (player->state == PLAYER_HURT && player->stunTime > 0) {
     // no need to change state
     return;
   }
@@ -297,9 +313,15 @@ void UpdatePlayer(Player *player, float deltaTime) {
   }
 
   // handle hurt state
-  player->invincibilityFrameTime -= deltaTime;
-  if (player->invincibilityFrameTime < 0) {
-    player->invincibilityFrameTime = 0;
+  player->invincibilityTime -= deltaTime;
+  player->stunTime -= deltaTime;
+
+  if (player->invincibilityTime < 0) {
+    player->invincibilityTime = 0;
+  }
+
+  if (player->stunTime < 0) {
+    player->stunTime = 0;
   }
 
   if (gamepadConnected) {
@@ -480,7 +502,8 @@ Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
        .isJumping = false,
        .canShoot = true,
        .shootingStateDelay = 0.0f,
-       .invincibilityFrameTime = 0.0f,
+       .invincibilityTime = 0.0f,
+       .stunTime = 0.0f,
        .color = BLUE,
        .sprite = sprite,
        .projectileTexture = projectileTexture,
@@ -614,12 +637,16 @@ const char *PlayerStateToString(PlayerState state) {
 }
 
 bool IsPlayerStunned(Player *player) {
-  return player->state == PLAYER_HURT && player->invincibilityFrameTime > 0;
+  return player->state == PLAYER_HURT && player->stunTime > 0;
 }
 
 void CheckPlayerHurt(Player *player, Enemy *enemy) {
 
   if (!enemy->active) {
+    return;
+  }
+
+  if (player->invincibilityTime > 0) {
     return;
   }
 
@@ -629,7 +656,6 @@ void CheckPlayerHurt(Player *player, Enemy *enemy) {
     // change state to hit
     // TODO: Update damage to enemy damage
     HurtPlayer(player, 5);
-    enemy->active = false;
   }
 }
 
@@ -645,7 +671,8 @@ void HurtPlayer(Player *player, int damage) {
   // set the velocity to move the character back and down
   player->velocity.x = PLAYER_HURT_SPEED;
   player->velocity.y = 0;
-  player->invincibilityFrameTime = PLAYER_HURT_INVINCIBILITY_TIME;
+  player->invincibilityTime = PLAYER_HURT_INVINCIBILITY_TIME;
+  player->stunTime = PLAYER_STUN_TIME;
 }
 
 void ChangeNextWeapon(Player *player) {

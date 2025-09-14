@@ -26,6 +26,7 @@
 #define PLAYER_FRAME_SIZE 40
 #define PLAYER_RUNNING_FRAME_DURATION 0.25
 #define PLAYER_HURT_FRAME_DURATION 0.1
+#define PLAYER_STUN_TIME 0.4
 #define PLAYER_HURT_INVINCIBILITY_TIME 1.5
 
 // in seconds
@@ -71,7 +72,8 @@ typedef struct {
     bool              isJumping;
     bool              canShoot;
     float             shootingStateDelay;
-    float             invincibilityFrameTime;
+    float             invincibilityTime;
+    float             stunTime;
     Color             color;
     Texture2D         sprite;
     Texture2D         projectileTexture;

@@ -21,6 +21,9 @@ void InitEnemy(Enemy *enemy, Vector2 position, Texture2D sprite) {
 
 void UpdateEnemy(Enemy *enemy, Vector2 playerPosition, float deltaTime) {
   if (!enemy->active) {
+    // respawn for now
+    enemy->active = true;
+    enemy->position = (Vector2){75, 75};
     return;
   }
 

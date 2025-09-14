@@ -17,6 +17,7 @@
 
 int screen_height = SCREEN_HEIGHT;
 int screen_width = SCREEN_WIDTH;
+
 char *screen_title = "Simple 2D Platformer";
 
 int main(int argc, char *argv[]) {
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
   player.weapons[WEAPON_RUSH_JET].active = true;
 
   Enemy singleEnemy;
-  InitEnemy(&singleEnemy, (Vector2){100, 100}, enemySprite);
+  InitEnemy(&singleEnemy, (Vector2){75, 75}, enemySprite);
 
   // enemies
   Enemy enemies[] = {singleEnemy};
