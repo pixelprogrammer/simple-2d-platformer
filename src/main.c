@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
   LoadSoundEffect(SOUND_SHOOT, "resources/audio/sfx-mega-buster.wav");
 
   // init resources
-  Player player = CreatePlayer(megaManSprite, projectileTexture);
+  PlayerEntity player = CreatePlayer(megaManSprite, projectileTexture);
 
   // add a few weapons
   player.weapons[WEAPON_FIRE].active = true;
@@ -60,7 +60,8 @@ int main(int argc, char *argv[]) {
 
   // add the 2D camera
   Camera2D camera = {0};
-  camera.target = (Vector2){player.position.x, player.position.y};
+  camera.target =
+      (Vector2){player.moveable.position.x, player.moveable.position.y};
   camera.zoom = 2.0f;
   camera.offset = (Vector2){screen_width / 2.0f, screen_height / 2.0f};
 
@@ -130,6 +131,8 @@ int main(int argc, char *argv[]) {
     Rectangle bounds = GetBoundsRect(camera);
 
     // Systems functions
+    PlayerControllerSystem(&player.controller, &player.actions);
+
     UpdatePlayer(&player, deltaTime);
     UpdatePlatforms(platforms, platformCount, deltaTime);
     UpdateProjectiles(&player.projectiles, deltaTime);
@@ -138,12 +141,13 @@ int main(int argc, char *argv[]) {
     CheckProjectileCollisions(&player.projectiles, bounds);
 
     for (int i = 0; i < 1; i++) {
-      UpdateEnemy(&enemies[i], player.position, deltaTime);
+      UpdateEnemy(&enemies[i], player.moveable.position, deltaTime);
       CheckPlayerHurt(&player, &enemies[i]);
     }
 
     // update camera target
-    camera.target = (Vector2){player.position.x, player.position.y};
+    camera.target =
+        (Vector2){player.moveable.position.x, player.moveable.position.y};
 
     // Rendering functions
     BeginDrawing();

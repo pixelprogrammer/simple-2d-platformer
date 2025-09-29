@@ -1,4 +1,5 @@
 #include "../src/player.h"
+#include "fallable.h"
 #include "terminal.h"
 #include <assert.h>
 #include <math.h>
@@ -23,17 +24,32 @@ typedef struct {
 } JumpFrame;
 
 int test_player_jump_height() {
-  Player player = {.position = {100, 400},
-                   .velocity = {0, 0},
-                   .onGround = true,
-                   .isJumping = false};
+  PlayerEntity player = {
+      .moveable =
+          {
+              .position = {100, 400},
+              .velocity = {0, 0},
+          },
+      .jump =
+          {
+              .jumpSpeed = JUMP_SPEED,
+              .jumpReleaseFactor = JUMP_RELEASE_FACTOR,
+              .onGround = true,
+              .isJumping = false,
+          },
+      .fall =
+          {
+              .maxFallSpeed = MAX_FALL_SPEED,
+              .gravity = GRAVITY,
+          },
+  };
 
   float deltaTime = 1.0f / 60.0f;
-  float initialY = player.position.y;
+  float initialY = player.moveable.position.y;
   JumpFrame frames[MAX_JUMP_FRAMES];
   int frameCount = 0;
 
-  player.velocity.y = JUMP_SPEED;
+  player.moveable.velocity.y = JUMP_SPEED;
   player.isJumping = true;
   player.onGround = false;
 
@@ -41,17 +57,25 @@ int test_player_jump_height() {
   printf("Frame | Height | Velocity\n");
   printf("------|--------|----------\n");
 
+  // emulate the controls
+  player.actions.jumpKeyDown = true;
+  player.actions.jumpKeyPressed = true;
+
   for (int frame = 0; frame < MAX_JUMP_FRAMES && frameCount < 120; frame++) {
-    HandleJump(&player, true, true, deltaTime);
+
+    HandleJump(&player, deltaTime);
+    FallSystem(&player.fall, &player.moveable);
+
     MovePlayer(&player, deltaTime);
 
-    float height = initialY - player.position.y;
-    frames[frameCount] = (JumpFrame){frame, height, player.velocity.y};
+    float height = initialY - player.moveable.position.y;
+    frames[frameCount] = (JumpFrame){frame, height, player.moveable.velocity.y};
     frameCount++;
 
-    printf("%5d | %6.1f | %8.1f\n", frame + 1, height, player.velocity.y);
+    printf("%5d | %6.1f | %8.1f\n", frame + 1, height,
+           player.moveable.velocity.y);
 
-    if (player.position.y >= initialY && frame > 0) {
+    if (player.moveable.position.y >= initialY && frame > 0) {
       break;
     }
   }
@@ -85,18 +109,26 @@ int test_player_jump_height() {
 }
 
 int test_jump_release_mechanics() {
-  Player player = {.position = {100, 400},
-                   .velocity = {0, 0},
-                   .onGround = true,
-                   .isJumping = true};
+  PlayerEntity player = {
+      .moveable =
+          {
+              .position = {100, 400},
+              .velocity = {0, 0},
+          },
+      .jump =
+          {
+              .onGround = true,
+              .isJumping = true,
+          },
+  };
 
-  player.velocity.y = JUMP_SPEED;
-  float velocityBeforeRelease = player.velocity.y;
+  player.moveable.velocity.y = JUMP_SPEED;
+  float velocityBeforeRelease = player.moveable.velocity.y;
 
-  player.velocity.y *= JUMP_RELEASE_FACTOR;
+  player.moveable.velocity.y *= JUMP_RELEASE_FACTOR;
   player.isJumping = false;
 
-  float velocityAfterRelease = player.velocity.y;
+  float velocityAfterRelease = player.moveable.velocity.y;
 
   printf("\nJump Release Test:\n");
   printf("Velocity before release: %.1f\n", velocityBeforeRelease);

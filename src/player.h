@@ -4,8 +4,13 @@
 #include <raylib.h>
 #include "./platform.h"
 #include "./animation.h"
+#include "actions.h"
 #include "enemy.h"
+#include "fallable.h"
 #include "healthbar.h"
+#include "jumpable.h"
+#include "moveable.h"
+#include "stunnable.h"
 #include "weapons.h"
 
 #define PLAYER_SPEED 82.5f
@@ -61,62 +66,64 @@ typedef enum {
 } PlayerColorMode;
 
 typedef struct {
-    Vector2           position;      // Center position of player
-    Vector2           prevPosition;  // Previous center position
-    Vector2           size;
-    Vector2           origin;
-    Vector2           velocity;
-    Rectangle         collisionBox;  // Offset from center position
-    Rectangle         hitBox;        // Offset from center position
-    bool              onGround;
-    bool              isJumping;
-    bool              canShoot;
-    float             shootingStateDelay;
-    float             invincibilityTime;
-    float             stunTime;
-    Color             color;
-    Texture2D         sprite;
-    Texture2D         projectileTexture;
-    Vector2           spriteOrigin;
-    PlayerState       state;
-    bool              facingRight;
-    AnimationTimeline timelines[PLAYER_TOTAL_STATES];
-    HealthBar         healthbar;
-    Shader            colorShader;
-    WeaponType        currentWeapon;
-    Weapon           *weapons;
-    ProjectileArray   projectiles;
-    int               gamepadId;
-    int               primaryTintColorLoc;
-    int               secondaryTintColorLoc;
-    int               primaryTargetColorLoc;
-    int               secondaryTargetColorLoc;
-    int               toleranceLoc;
-} Player;
+    int gamepadId;
+} PlayerControllerComponent;
 
-void      UpdatePlayer(Player *player, float deltaTime);
-void      UpdatePlayerWeaponHealthbarColor(Player *player);
-void      UpdatePlayerState(Player *player, float inputDirection, bool isRunning, bool isShooting);
-void      DrawPlayer(Player player, bool debugMode);
-void      MovePlayer(Player *player, float deltaTime);
-void      HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown, float deltaTime);
-void      HandleShooting(Player *player,
-                         bool    shootButtonDown,
-                         bool    shootButtonReleased,
-                         float   deltaTime);
-void      CheckPlayerHurt(Player *player, Enemy *enemy);
-void      HurtPlayer(Player *player, int damage);
-bool      IsPlayerStunned(Player *player);
-Rectangle GetPlayerPosition(Player *player);
-void      CheckPlayerCollisions(Player *player, Platform platforms[], int platformCount);
-Player    CreatePlayer(Texture2D sprite, Texture2D projectileTexture);
-AnimationTimeline GetCurrentAnimationTimeline(Player *player);
-bool              ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState);
-void        CopyPlayerAnimationTimeline(Player *player, PlayerState newState, PlayerState oldState);
+typedef struct {
+    MoveComponent             moveable;
+    PlayerControllerComponent controller;
+    ActionsComponent          actions;
+    StunComponent             stun;
+    JumpComponent             jump;
+    FallComponent             fall;
+    Vector2                   size;
+    Vector2                   origin;
+    Rectangle                 collisionBox;  // Offset from center position
+    Rectangle                 hitBox;        // Offset from center position
+    bool                      onGround;
+    bool                      isJumping;
+    bool                      canShoot;
+    float                     shootingStateDelay;
+    Color                     color;
+    Texture2D                 sprite;
+    Texture2D                 projectileTexture;
+    Vector2                   spriteOrigin;
+    PlayerState               state;
+    bool                      facingRight;
+    AnimationTimeline         timelines[PLAYER_TOTAL_STATES];
+    HealthBar                 healthbar;
+    Shader                    colorShader;
+    WeaponType                currentWeapon;
+    Weapon                   *weapons;
+    ProjectileArray           projectiles;
+    int                       primaryTintColorLoc;
+    int                       secondaryTintColorLoc;
+    int                       primaryTargetColorLoc;
+    int                       secondaryTargetColorLoc;
+    int                       toleranceLoc;
+} PlayerEntity;
+
+void         UpdatePlayer(PlayerEntity *player, float deltaTime);
+void         UpdatePlayerWeaponHealthbarColor(PlayerEntity *player);
+void         UpdatePlayerState(PlayerEntity *player);
+void         DrawPlayer(PlayerEntity player, bool debugMode);
+void         MovePlayer(PlayerEntity *player, float deltaTime);
+void         HandleJump(PlayerEntity *player, float deltaTime);
+void         HandleShooting(PlayerEntity *player, float deltaTime);
+void         CheckPlayerHurt(PlayerEntity *player, Enemy *enemy);
+void         HurtPlayer(PlayerEntity *player, int damage);
+bool         IsPlayerStunned(PlayerEntity *player);
+Rectangle    GetPlayerPosition(PlayerEntity *player);
+void         CheckPlayerCollisions(PlayerEntity *player, Platform platforms[], int platformCount);
+PlayerEntity CreatePlayer(Texture2D sprite, Texture2D projectileTexture);
+AnimationTimeline GetCurrentAnimationTimeline(PlayerEntity *player);
+bool              ShouldPlayerResetAnimationTimeline(PlayerEntity *player, PlayerState newState);
+void CopyPlayerAnimationTimeline(PlayerEntity *player, PlayerState newState, PlayerState oldState);
 const char *PlayerStateToString(PlayerState state);
 HealthBar   CreatePlayerWeaponHealthBar();
-Weapon     *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]);
-void        ChangeNextWeapon(Player *player);
-bool        CanPlayerShoot(Player *player);
+Weapon     *GetCurrentWeapon(PlayerEntity *player, Weapon *weapons[WEAPON_TOTAL]);
+void        ChangeNextWeapon(PlayerEntity *player);
+bool        CanPlayerShoot(PlayerEntity *player);
+void PlayerControllerSystem(PlayerControllerComponent *controller, ActionsComponent *actions);
 
 #endif

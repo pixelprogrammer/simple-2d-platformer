@@ -1,10 +1,13 @@
 #include "./player.h"
 #include "./screen.c"
+#include "actions.h"
 #include "animation.h"
 #include "enemy.h"
+#include "fallable.h"
 #include "healthbar.h"
 #include "screen.h"
 #include "sound.h"
+#include "stunnable.h"
 #include "weapons.h"
 #include <math.h>
 #include <raylib.h>
@@ -19,29 +22,31 @@ Vector3 PLAYER_PRIMARY_COLOR = (Vector3){0.0f, 0.45f, 0.95f};
 Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
 float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
 
-void MovePlayer(Player *player, float deltaTime) {
-  player->position.x += player->velocity.x * deltaTime;
-  player->position.y += player->velocity.y * deltaTime;
+void MovePlayer(PlayerEntity *player, float deltaTime) {
+  player->moveable.position.x += player->moveable.velocity.x * deltaTime;
+  player->moveable.position.y += player->moveable.velocity.y * deltaTime;
+
+  if (player->moveable.position.x + player->collisionBox.x < 0) {
+    player->moveable.position.x = -player->collisionBox.x;
+  }
 
   // keep player within screen bounds
-  if (player->position.x + player->collisionBox.x < 0) {
-    player->position.x = -player->collisionBox.x;
-  }
-  if (player->position.x + player->collisionBox.x + player->collisionBox.width >
+  if (player->moveable.position.x + player->collisionBox.x +
+          player->collisionBox.width >
       SCREEN_WIDTH) {
-    player->position.x =
+    player->moveable.position.x =
         SCREEN_WIDTH - player->collisionBox.x - player->collisionBox.width;
   }
 }
 
-AnimationTimeline GetCurrentAnimationTimeline(Player *player) {
+AnimationTimeline GetCurrentAnimationTimeline(PlayerEntity *player) {
   return player->timelines[player->state];
 }
 
-void DrawPlayer(Player player, bool debugMode) {
+void DrawPlayer(PlayerEntity player, bool debugMode) {
   bool shouldDraw = true;
-  if (player.invincibilityTime > 0) {
-    int iFrameTime = player.invincibilityTime * 1000;
+  if (player.stun.invincibilityTime > 0) {
+    int iFrameTime = player.stun.invincibilityTime * 1000;
     int iFrame = iFrameTime % 200;
 
     if (iFrame < 100) {
@@ -55,8 +60,8 @@ void DrawPlayer(Player player, bool debugMode) {
 
       AnimationTimeline timeline = GetCurrentAnimationTimeline(&player);
       Vector2 size = {timeline.frame.width, timeline.frame.height};
-      Vector2 drawPosition = {player.position.x + timeline.position.x,
-                              player.position.y + timeline.position.y};
+      Vector2 drawPosition = {player.moveable.position.x + timeline.position.x,
+                              player.moveable.position.y + timeline.position.y};
       Vector2 origin =
           (Vector2){timeline.frame.width / 2 + timeline.position.x,
                     timeline.frame.height / 2 + timeline.position.y};
@@ -119,8 +124,8 @@ void DrawPlayer(Player player, bool debugMode) {
         EndShaderMode();
       }
     } else {
-      Vector2 drawPosition = {player.position.x - player.size.x / 2,
-                              player.position.y - player.size.y / 2};
+      Vector2 drawPosition = {player.moveable.position.x - player.size.x / 2,
+                              player.moveable.position.y - player.size.y / 2};
       Rectangle playerRect = {drawPosition.x, drawPosition.y, player.size.x,
                               player.size.y};
       DrawRectangleRec(playerRect, player.color);
@@ -128,8 +133,8 @@ void DrawPlayer(Player player, bool debugMode) {
   }
 
   if (debugMode) {
-    // Rectangle hitBoxRect = {player.position.x + player.hitBox.x,
-    //                         player.position.y + player.hitBox.y,
+    // Rectangle hitBoxRect = {player.moveable.position.x + player.hitBox.x,
+    //                         player.moveable.position.y + player.hitBox.y,
     //                         player.hitBox.width, player.hitBox.height};
     // DrawRectangleLinesEx(hitBoxRect, 1.0f, RED);
 
@@ -141,16 +146,16 @@ void DrawPlayer(Player player, bool debugMode) {
   }
 }
 
-void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
-                       bool isShooting) {
+void UpdatePlayerState(PlayerEntity *player) {
   PlayerState newState = player->state;
 
-  if (player->state == PLAYER_HURT && player->stunTime > 0) {
+  if (player->state == PLAYER_HURT && player->stun.stunTime > 0) {
     // no need to change state
     return;
   }
 
-  bool isPlayerInShootingState = player->canShoot && isShooting;
+  bool isPlayerInShootingState =
+      player->canShoot && player->actions.shootButtonDown;
   if (player->shootingStateDelay > 0.0f) {
     isPlayerInShootingState = true;
   }
@@ -158,14 +163,9 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
   if (!player->onGround) {
     newState =
         isPlayerInShootingState ? PLAYER_JUMPING_SHOOTING : PLAYER_JUMPING;
-  } else if (fabs(inputDirection) > 0.1f) {
-    if (isRunning) {
-      newState =
-          isPlayerInShootingState ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
-    } else {
-      newState =
-          isPlayerInShootingState ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
-    }
+  } else if (fabs(player->actions.axisDirection.x) > 0.1f) {
+    newState =
+        isPlayerInShootingState ? PLAYER_RUNNING_SHOOTING : PLAYER_RUNNING;
   } else {
     newState =
         isPlayerInShootingState ? PLAYER_STANDING_SHOOTING : PLAYER_STANDING;
@@ -189,7 +189,7 @@ void UpdatePlayerState(Player *player, float inputDirection, bool isRunning,
  * This is to help maintain similar frames between the two states like running
  * and running+shooting
  */
-void CopyPlayerAnimationTimeline(Player *player, PlayerState newState,
+void CopyPlayerAnimationTimeline(PlayerEntity *player, PlayerState newState,
                                  PlayerState oldState) {
   player->timelines[newState].currentFrameIndex =
       player->timelines[oldState].currentFrameIndex;
@@ -197,7 +197,8 @@ void CopyPlayerAnimationTimeline(Player *player, PlayerState newState,
       player->timelines[oldState].currentTime;
 }
 
-bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
+bool ShouldPlayerResetAnimationTimeline(PlayerEntity *player,
+                                        PlayerState newState) {
   if (player->state != PLAYER_RUNNING_SHOOTING &&
       player->state != PLAYER_RUNNING) {
     return true;
@@ -212,7 +213,7 @@ bool ShouldPlayerResetAnimationTimeline(Player *player, PlayerState newState) {
   return true;
 }
 
-void ShootWeapon(Player *player) {
+void ShootWeapon(PlayerEntity *player) {
   if (!player->canShoot) {
     return;
   }
@@ -223,8 +224,8 @@ void ShootWeapon(Player *player) {
   }
 
   Vector2 projectilePos = (Vector2){
-      .x = player->position.x + (16 * direction),
-      .y = player->position.y,
+      .x = player->moveable.position.x + (16 * direction),
+      .y = player->moveable.position.y,
   };
 
   SpawnProjectile(&player->projectiles, player->projectileTexture,
@@ -235,8 +236,7 @@ void ShootWeapon(Player *player) {
   player->shootingStateDelay = PLAYER_SHOOTING_STATE_TIME;
 }
 
-void HandleShooting(Player *player, bool shootButtonDown,
-                    bool shootButtonReleased, float deltaTime) {
+void HandleShooting(PlayerEntity *player, float deltaTime) {
   // update shooting delay
   if (player->shootingStateDelay > 0.0f) {
     player->shootingStateDelay -= deltaTime;
@@ -245,7 +245,7 @@ void HandleShooting(Player *player, bool shootButtonDown,
     }
   }
 
-  if (shootButtonReleased) {
+  if (player->actions.shootButtonReleased) {
     player->canShoot = true;
   }
 
@@ -255,7 +255,7 @@ void HandleShooting(Player *player, bool shootButtonDown,
     return;
   }
 
-  if (!shootButtonDown) {
+  if (!player->actions.shootButtonDown) {
     // no need to do anything else
     return;
   }
@@ -263,26 +263,20 @@ void HandleShooting(Player *player, bool shootButtonDown,
   ShootWeapon(player);
 }
 
-void HandleJump(Player *player, bool jumpKeyPressed, bool jumpKeyDown,
-                float deltaTime) {
-  if (jumpKeyPressed && player->onGround) {
-    player->velocity.y = JUMP_SPEED;
+void HandleJump(PlayerEntity *player, float deltaTime) {
+  if (player->actions.jumpKeyPressed && player->onGround) {
+    player->moveable.velocity.y = player->jump.jumpSpeed;
     player->isJumping = true;
   }
 
-  // what is the for exactly?
-  if (player->isJumping && !jumpKeyDown) {
-    player->velocity.y *= JUMP_RELEASE_FACTOR;
+  // Continue the height of the jump slightly after release
+  if (player->isJumping && !player->actions.jumpKeyDown) {
+    player->moveable.velocity.y *= player->jump.jumpReleaseFactor;
     player->isJumping = false;
-  }
-
-  player->velocity.y += GRAVITY;
-  if (player->velocity.y > MAX_FALL_SPEED) {
-    player->velocity.y = MAX_FALL_SPEED;
   }
 }
 
-bool CanPlayerShoot(Player *player) {
+bool CanPlayerShoot(PlayerEntity *player) {
   if (!player->canShoot) {
     return false;
   }
@@ -295,128 +289,56 @@ bool CanPlayerShoot(Player *player) {
   return true;
 }
 
-void UpdatePlayer(Player *player, float deltaTime) {
-
-  bool gamepadConnected = IsGamepadAvailable(player->gamepadId);
-  float inputDirection = 0.0f;
-
-  if (!gamepadConnected) {
-    // try to detect a controller
-    for (int i = 0; i < MAX_GAMEPADS; i++) {
-      if (IsGamepadAvailable(i) &&
-          IsGamepadButtonDown(i, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
-        // set the gamepadId
-        player->gamepadId = i;
-        break;
-      }
-    }
-  }
+void UpdatePlayer(PlayerEntity *player, float deltaTime) {
 
   // handle hurt state
-  player->invincibilityTime -= deltaTime;
-  player->stunTime -= deltaTime;
-
-  if (player->invincibilityTime < 0) {
-    player->invincibilityTime = 0;
-  }
-
-  if (player->stunTime < 0) {
-    player->stunTime = 0;
-  }
-
-  if (gamepadConnected) {
-    float axisX =
-        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X);
-    if (fabs(axisX) > 0.1f) {
-      inputDirection = axisX;
-    }
-
-    if (IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
-        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X) <
-            -0.1f) {
-      inputDirection = -1.0f;
-    }
-    if (IsGamepadButtonDown(player->gamepadId,
-                            GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
-        GetGamepadAxisMovement(player->gamepadId, GAMEPAD_AXIS_LEFT_X) > 0.1f) {
-      inputDirection = 1.0f;
-    }
-  }
-
-  if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-    inputDirection = -1.0f;
-  }
-  if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-    inputDirection = 1.0f;
-  }
-
-  bool shootButtonDown =
-      (IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
-       IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT));
-
-  // NOTE: This being before the shooting mechanic might cause some fun things
-  // if multiple buttons can shoot
-  bool shootButtonReleased = IsGamepadButtonReleased(
-      player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
-
-  // change weapon/colormode
-  // TODO: Change weapon
-  bool changeWeapon = IsKeyPressed(KEY_C) ||
-                      IsGamepadButtonPressed(player->gamepadId,
-                                             GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+  UpdateStunSystem(&player->stun, deltaTime);
 
   // NOTE: Friction logic
   //   else {
-  //   if (player->velocity.x > 0) {
-  //     player->velocity.x -= PLAYER_FRICTION * deltaTime;
-  //     if (player->velocity.x < 0)
-  //       player->velocity.x = 0;
-  //   } else if (player->velocity.x < 0) {
-  //     player->velocity.x += PLAYER_FRICTION * deltaTime;
-  //     if (player->velocity.x > 0)
-  //       player->velocity.x = 0;
+  //   if (player->moveable.velocity.x > 0) {
+  //     player->moveable.velocity.x -= PLAYER_FRICTION * deltaTime;
+  //     if (player->moveable.velocity.x < 0)
+  //       player->moveable.velocity.x = 0;
+  //   } else if (player->moveable.velocity.x < 0) {
+  //     player->moveable.velocity.x += PLAYER_FRICTION * deltaTime;
+  //     if (player->moveable.velocity.x > 0)
+  //       player->moveable.velocity.x = 0;
   //   }
   // }
 
-  bool jumpKeyPressed =
-      IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
-      IsGamepadButtonPressed(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-  bool jumpKeyDown =
-      IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) || IsKeyDown(KEY_W) ||
-      IsGamepadButtonDown(player->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
-
   if (!IsPlayerStunned(player)) {
-    if (inputDirection != 0.0f) {
-      player->velocity.x = inputDirection * PLAYER_SPEED;
-      player->facingRight = (inputDirection > 0);
+    if (player->actions.axisDirection.x != 0.0f) {
+      player->moveable.velocity.x =
+          player->actions.axisDirection.x * player->moveable.speed.x;
+      player->facingRight = (player->actions.axisDirection.x > 0);
     } else {
-      player->velocity.x = 0;
+      player->moveable.velocity.x = 0;
     }
-    if (changeWeapon) {
+    if (player->actions.changeWeaponNextPressed) {
       ChangeNextWeapon(player);
     }
-    HandleShooting(player, shootButtonDown, shootButtonReleased, deltaTime);
-    HandleJump(player, jumpKeyPressed, jumpKeyDown, deltaTime);
-  } else {
-
-    HandleJump(player, false, false, deltaTime);
+    HandleShooting(player, deltaTime);
+    HandleJump(player, deltaTime);
   }
+
+  FallSystem(&player->fall, &player->moveable);
 
   MovePlayer(player, deltaTime);
 
-  UpdatePlayerState(player, inputDirection, false, shootButtonDown);
+  UpdatePlayerState(player);
   PlayAnimationTimeline(&player->timelines[player->state], deltaTime);
 
   player->onGround = false;
 }
 
-Rectangle GetPlayerPosition(Player *player) {
-  return (Rectangle){player->position.x + player->collisionBox.x,
-                     player->position.y + player->collisionBox.y,
+Rectangle GetPlayerPosition(PlayerEntity *player) {
+  return (Rectangle){player->moveable.position.x + player->collisionBox.x,
+                     player->moveable.position.y + player->collisionBox.y,
                      player->collisionBox.width, player->collisionBox.height};
 }
 
-void CheckPlayerCollisions(Player *player, Platform platforms[],
+void CheckPlayerCollisions(PlayerEntity *player, Platform platforms[],
                            int platformCount) {
   Rectangle playerRect = GetPlayerPosition(player);
   static int groundedPlatformIndex = -1;
@@ -438,9 +360,10 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
       if (overlapTop < overlapBottom && overlapTop < overlapLeft &&
           overlapTop < overlapRight) {
         // Collision from top (player landing on platform)
-        if (player->velocity.y > 0) {
-          player->position.y = platforms[i].rect.y + player->collisionBox.y;
-          player->velocity.y = 0;
+        if (player->moveable.velocity.y > 0) {
+          player->moveable.position.y =
+              platforms[i].rect.y + player->collisionBox.y;
+          player->moveable.velocity.y = 0;
           player->onGround = true;
           player->isJumping = false;
           groundedPlatformIndex = i;
@@ -448,23 +371,26 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
       } else if (overlapBottom < overlapTop && overlapBottom < overlapLeft &&
                  overlapBottom < overlapRight) {
         // Collision from bottom (player hitting platform from below)
-        if (player->velocity.y < 0) {
-          player->position.y = platforms[i].rect.y + platforms[i].rect.height -
-                               player->collisionBox.y;
-          player->velocity.y = 0;
+        if (player->moveable.velocity.y < 0) {
+          player->moveable.position.y = platforms[i].rect.y +
+                                        platforms[i].rect.height -
+                                        player->collisionBox.y;
+          player->moveable.velocity.y = 0;
         }
       } else if (overlapLeft < overlapRight) {
         // Collision from left (player moving right into platform)
-        if (player->velocity.x > 0) {
-          player->position.x = platforms[i].rect.x + player->collisionBox.x;
-          player->velocity.x = 0;
+        if (player->moveable.velocity.x > 0) {
+          player->moveable.position.x =
+              platforms[i].rect.x + player->collisionBox.x;
+          player->moveable.velocity.x = 0;
         }
       } else {
         // Collision from right (player moving left into platform)
-        if (player->velocity.x < 0) {
-          player->position.x = platforms[i].rect.x + platforms[i].rect.width -
-                               player->collisionBox.x;
-          player->velocity.x = 0;
+        if (player->moveable.velocity.x < 0) {
+          player->moveable.position.x = platforms[i].rect.x +
+                                        platforms[i].rect.width -
+                                        player->collisionBox.x;
+          player->moveable.velocity.x = 0;
         }
       }
     }
@@ -476,8 +402,10 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
     Platform *groundedPlatform = &platforms[groundedPlatformIndex];
     if (groundedPlatform->type != PLATFORM_STATIC) {
       // Move player with the platform
-      player->position.x += groundedPlatform->velocity.x * GetFrameTime();
-      player->position.y += groundedPlatform->velocity.y * GetFrameTime();
+      player->moveable.position.x +=
+          groundedPlatform->velocity.x * GetFrameTime();
+      player->moveable.position.y +=
+          groundedPlatform->velocity.y * GetFrameTime();
     }
   }
 
@@ -487,76 +415,131 @@ void CheckPlayerCollisions(Player *player, Platform platforms[],
   }
 }
 
-Player CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
-  Player player =
-      {.position = {111, 412},
-       .prevPosition = {111, 412},
-       .size = PLAYER_SIZE,
-       .origin = {0, 0},
-       .velocity = {0, 0},
-       .collisionBox = {-PLAYER_SIZE.x / 2, -PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
-                        PLAYER_SIZE.y},
-       .hitBox = {PLAYER_SIZE.x / 2, PLAYER_SIZE.y / 2, PLAYER_SIZE.x,
-                  PLAYER_SIZE.y},
-       .onGround = false,
-       .isJumping = false,
-       .canShoot = true,
-       .shootingStateDelay = 0.0f,
-       .invincibilityTime = 0.0f,
-       .stunTime = 0.0f,
-       .color = BLUE,
-       .sprite = sprite,
-       .projectileTexture = projectileTexture,
-       .currentWeapon = WEAPON_BUSTER,
-       .weapons = CreateWeaponsArray(),
-       .projectiles = {.length = 0},
-       .gamepadId = -1,
-       .healthbar = CreateHealthBar(
-           (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
-           PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),
-       .timelines = {
-           [PLAYER_STANDING] = {.loop = true,
-                                .position = {-11, -12},
-                                .frame = {0, 0, PLAYER_FRAME_SIZE,
-                                          PLAYER_FRAME_SIZE},
-                                .frameGap = 0},
-           [PLAYER_STANDING_SHOOTING] = {.loop = true,
-                                         .position = {-11, -12},
-                                         .frame = {80, 0, PLAYER_FRAME_SIZE,
-                                                   PLAYER_FRAME_SIZE},
-                                         .frameGap = 0},
-           [PLAYER_RUNNING] = {.loop = true,
-                               .position = {-11, -11},
-                               .frame = {0, 40, PLAYER_FRAME_SIZE,
-                                         PLAYER_FRAME_SIZE},
-                               .frameGap = 0},
-           [PLAYER_RUNNING_SHOOTING] = {.loop = true,
-                                        .position = {-11, -11},
-                                        .frame = {0, 80, PLAYER_FRAME_SIZE,
-                                                  PLAYER_FRAME_SIZE},
-                                        .frameGap = 0},
-           [PLAYER_JUMPING] = {.loop = true,
-                               .position = {-13, -15},
-                               .frame = {0, 120, PLAYER_FRAME_SIZE,
-                                         PLAYER_FRAME_SIZE},
-                               .frameGap = 0},
-           [PLAYER_JUMPING_SHOOTING] = {.loop = true,
-                                        .position = {-13, -15},
-                                        .frame = {0, 160, PLAYER_FRAME_SIZE,
-                                                  PLAYER_FRAME_SIZE},
-                                        .frameGap = 0},
-           [PLAYER_CLIMBING] = {},
-           [PLAYER_CLIMBING_SHOOTING] = {},
-           [PLAYER_SLIDING] = {},
-           [PLAYER_HURT] =
-               {
-                   .loop = true,
-                   .position = {-11, -11},
-                   .frame = {0, 320, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
-                   .frameGap = 0,
-               },
+PlayerEntity CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
+  PlayerEntity player = {
+      .moveable =
+          {
+              .position = {111, 412},
+              .prevPosition = {111, 412},
+              .velocity = {0, 0},
+              .speed = {PLAYER_SPEED, 0},
+          },
+      .controller =
+          {
+              .gamepadId = -1,
+          },
+      .actions =
+          {
+              .axisDirection = (Vector2){0, 0},
+              .jumpKeyDown = false,
+              .jumpKeyPressed = false,
+              .shootButtonDown = false,
+              .shootButtonReleased = false,
+              .changeWeaponNextPressed = false,
+              .changeWeaponPrevPressed = false,
+              .moveAxis = (Vector2){0, 0},
+          },
+      .jump =
+          {
+              .isJumping = false,
+              .jumpReleaseFactor = JUMP_RELEASE_FACTOR,
+              .jumpSpeed = JUMP_SPEED,
+              .onGround = false,
+          },
+      .fall =
+          {
+              .maxFallSpeed = MAX_FALL_SPEED,
+              .gravity = GRAVITY,
+          },
+      .stun =
+          {
+              .invincibilityTime = 0.0f,
+              .stunTime = 0.0f,
+          },
+      .size = PLAYER_SIZE,
+      .origin = {0, 0},
+      .collisionBox =
+          {
+              -PLAYER_SIZE.x / 2,
+              -PLAYER_SIZE.y / 2,
+              PLAYER_SIZE.x,
+              PLAYER_SIZE.y,
+          },
+      .hitBox =
+          {
+              PLAYER_SIZE.x / 2,
+              PLAYER_SIZE.y / 2,
+              PLAYER_SIZE.x,
+              PLAYER_SIZE.y,
+          },
+      .onGround = false,
+      .isJumping = false,
+      .canShoot = true,
+      .shootingStateDelay = 0.0f,
+      .color = BLUE,
+      .sprite = sprite,
+      .projectileTexture = projectileTexture,
+      .currentWeapon = WEAPON_BUSTER,
+      .weapons = CreateWeaponsArray(),
+      .projectiles = {.length = 0},
+      .healthbar = CreateHealthBar(
+          (Vector2){50, 100}, PLAYER_HEALTHBAR_MAX_HEALTH,
+          PLAYER_HEALTHBAR_SEGMENT_WIDTH, PLAYER_HEALTHBAR_SEGMENT_HEIGHT),
+      .timelines = {
+          [PLAYER_STANDING] =
+              {
+                  .loop = true,
+                  .position = {-11, -12},
+                  .frame = {0, 0, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_STANDING_SHOOTING] =
+              {
+                  .loop = true,
+                  .position = {-11, -12},
+                  .frame = {80, 0, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_RUNNING] =
+              {
+                  .loop = true,
+                  .position = {-11, -11},
+                  .frame = {0, 40, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_RUNNING_SHOOTING] =
+              {
+                  .loop = true,
+                  .position = {-11, -11},
+                  .frame = {0, 80, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_JUMPING] =
+              {
+                  .loop = true,
+                  .position = {-13, -15},
+                  .frame = {0, 120, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_JUMPING_SHOOTING] =
+              {
+                  .loop = true,
+                  .position = {-13, -15},
+                  .frame = {0, 160, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
+          [PLAYER_CLIMBING] = {},
+          [PLAYER_CLIMBING_SHOOTING] = {},
+          [PLAYER_SLIDING] = {},
+          [PLAYER_HURT] =
+              {
+                  .loop = true,
+                  .position = {-11, -11},
+                  .frame = {0, 320, PLAYER_FRAME_SIZE, PLAYER_FRAME_SIZE},
+                  .frameGap = 0,
+              },
 
-       }};
+      }};
 
   // add the frames to each timeline
   // Standing and blinking
@@ -636,17 +619,17 @@ const char *PlayerStateToString(PlayerState state) {
   }
 }
 
-bool IsPlayerStunned(Player *player) {
-  return player->state == PLAYER_HURT && player->stunTime > 0;
+bool IsPlayerStunned(PlayerEntity *player) {
+  return player->state == PLAYER_HURT && player->stun.stunTime > 0;
 }
 
-void CheckPlayerHurt(Player *player, Enemy *enemy) {
+void CheckPlayerHurt(PlayerEntity *player, Enemy *enemy) {
 
   if (!enemy->active) {
     return;
   }
 
-  if (player->invincibilityTime > 0) {
+  if (player->stun.invincibilityTime > 0) {
     return;
   }
 
@@ -659,7 +642,7 @@ void CheckPlayerHurt(Player *player, Enemy *enemy) {
   }
 }
 
-void HurtPlayer(Player *player, int damage) {
+void HurtPlayer(PlayerEntity *player, int damage) {
 
   player->state = PLAYER_HURT;
   SetHealthBar(&player->healthbar, player->healthbar.currentHealth - damage);
@@ -669,13 +652,18 @@ void HurtPlayer(Player *player, int damage) {
   }
 
   // set the velocity to move the character back and down
-  player->velocity.x = PLAYER_HURT_SPEED;
-  player->velocity.y = 0;
-  player->invincibilityTime = PLAYER_HURT_INVINCIBILITY_TIME;
-  player->stunTime = PLAYER_STUN_TIME;
+  if (player->facingRight) {
+    player->moveable.velocity.x = -PLAYER_HURT_SPEED;
+  } else {
+    player->moveable.velocity.x = PLAYER_HURT_SPEED;
+  }
+
+  player->moveable.velocity.y = 0;
+  player->stun.invincibilityTime = PLAYER_HURT_INVINCIBILITY_TIME;
+  player->stun.stunTime = PLAYER_STUN_TIME;
 }
 
-void ChangeNextWeapon(Player *player) {
+void ChangeNextWeapon(PlayerEntity *player) {
   for (int i = player->currentWeapon + 1; i <= WEAPON_TOTAL; i++) {
     if (player->weapons[i].active) {
       player->currentWeapon = i;
@@ -686,6 +674,85 @@ void ChangeNextWeapon(Player *player) {
   player->currentWeapon = WEAPON_BUSTER;
 }
 
-Weapon *GetCurrentWeapon(Player *player, Weapon *weapons[WEAPON_TOTAL]) {
+Weapon *GetCurrentWeapon(PlayerEntity *player, Weapon *weapons[WEAPON_TOTAL]) {
   return weapons[player->currentWeapon];
+}
+
+void PlayerControllerSystem(PlayerControllerComponent *controller,
+                            ActionsComponent *actions) {
+  // reset direction state
+  actions->axisDirection = (Vector2){0, 0};
+
+  bool gamepadConnected = IsGamepadAvailable(controller->gamepadId);
+  if (!gamepadConnected) {
+    // try to detect a controller
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+      if (IsGamepadAvailable(i) &&
+          IsGamepadButtonDown(i, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
+        // set the gamepadId
+        controller->gamepadId = i;
+        gamepadConnected = true;
+        break;
+      }
+    }
+  }
+
+  if (!gamepadConnected) {
+    // we tried to connect, still don't have a connection
+    return;
+  }
+
+  // detect player x axis movement
+  float axisX =
+      GetGamepadAxisMovement(controller->gamepadId, GAMEPAD_AXIS_LEFT_X);
+  if (fabs(axisX) > 0.1f) {
+    actions->axisDirection.x = axisX;
+  }
+
+  if (IsGamepadButtonDown(controller->gamepadId,
+                          GAMEPAD_BUTTON_LEFT_FACE_LEFT) ||
+      GetGamepadAxisMovement(controller->gamepadId, GAMEPAD_AXIS_LEFT_X) <
+          -0.1f) {
+    actions->axisDirection.x = -1.0f;
+  }
+  if (IsGamepadButtonDown(controller->gamepadId,
+                          GAMEPAD_BUTTON_LEFT_FACE_RIGHT) ||
+      GetGamepadAxisMovement(controller->gamepadId, GAMEPAD_AXIS_LEFT_X) >
+          0.1f) {
+    actions->axisDirection.x = 1.0f;
+  }
+  // keyboard detection takes priority over controller
+  if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
+    actions->axisDirection.x = -1.0f;
+  }
+  if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
+    actions->axisDirection.x = 1.0f;
+  }
+
+  // TODO: add the y axis here. Might be needed for controlling weapons
+  actions->shootButtonDown =
+      (IsKeyDown(KEY_X) || IsKeyDown(KEY_Z) ||
+       IsGamepadButtonDown(controller->gamepadId,
+                           GAMEPAD_BUTTON_RIGHT_FACE_LEFT));
+
+  // NOTE: This being before the shooting mechanic might cause some fun things
+  // if multiple buttons can shoot
+  actions->shootButtonReleased = IsGamepadButtonReleased(
+      controller->gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+
+  // change weapon/colormode
+  // TODO: Change weapon
+  actions->changeWeaponNextPressed =
+      IsKeyPressed(KEY_C) ||
+      IsGamepadButtonPressed(controller->gamepadId,
+                             GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+
+  actions->jumpKeyPressed =
+      IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) ||
+      IsGamepadButtonPressed(controller->gamepadId,
+                             GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
+  actions->jumpKeyDown = IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_UP) ||
+                         IsKeyDown(KEY_W) ||
+                         IsGamepadButtonDown(controller->gamepadId,
+                                             GAMEPAD_BUTTON_RIGHT_FACE_DOWN);
 }
