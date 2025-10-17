@@ -23,9 +23,9 @@ Vector3 PLAYER_SECONDARY_COLOR = (Vector3){0.0f, 1.0f, 1.0f};
 float PLAYER_SHADER_COLOR_SWAP_TOLERANCE = 0.1f;
 
 void MovePlayer(PlayerEntity *player, float deltaTime) {
-  player->moveable.position.x += player->moveable.velocity.x * deltaTime;
-  player->moveable.position.y += player->moveable.velocity.y * deltaTime;
+  SystemMoveEntity(&player->moveable, deltaTime);
 
+  // update players collisionbox to player position
   if (player->moveable.position.x + player->collisionBox.x < 0) {
     player->moveable.position.x = -player->collisionBox.x;
   }
@@ -623,11 +623,7 @@ bool IsPlayerStunned(PlayerEntity *player) {
   return player->state == PLAYER_HURT && player->stun.stunTime > 0;
 }
 
-void CheckPlayerHurt(PlayerEntity *player, Enemy *enemy) {
-
-  if (!enemy->active) {
-    return;
-  }
+void CheckPlayerHurt(PlayerEntity *player, Rectangle hitbox) {
 
   if (player->stun.invincibilityTime > 0) {
     return;
@@ -635,7 +631,7 @@ void CheckPlayerHurt(PlayerEntity *player, Enemy *enemy) {
 
   Rectangle playerRect = GetPlayerPosition(player);
 
-  if (CheckCollisionRecs(playerRect, enemy->hitbox)) {
+  if (CheckCollisionRecs(playerRect, hitbox)) {
     // change state to hit
     // TODO: Update damage to enemy damage
     HurtPlayer(player, 5);

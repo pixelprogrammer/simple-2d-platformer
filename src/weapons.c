@@ -71,6 +71,7 @@ void UpdateProjectile(Projectile *projectile, float deltaTime) {
     projectile->position.x +=
         BUSTER_SHOT_SPEED * deltaTime * projectile->direction;
     projectile->sprite.dest.x = projectile->position.x;
+    projectile->hitBox.x = projectile->position.x;
     break;
   }
 }
@@ -116,10 +117,20 @@ Projectile CreateBusterProjectile(Texture2D texture, Vector2 position,
                       .width = BUSTER_SHOT_WIDTH,
                       .height = BUSTER_SHOT_HEIGHT,
                   },
-              .origin = (Vector2){.x = BUSTER_SHOT_WIDTH / 2.0f,
-                                  .y = BUSTER_SHOT_HEIGHT / 2.0f},
+              .origin =
+                  (Vector2){
+                      .x = BUSTER_SHOT_WIDTH / 2.0f,
+                      .y = BUSTER_SHOT_HEIGHT / 2.0f,
+                  },
           },
       .position = position,
+      .hitBox =
+          {
+              .x = position.x,
+              .y = position.y,
+              .width = BUSTER_SHOT_WIDTH,
+              .height = BUSTER_SHOT_HEIGHT,
+          },
       .type = WEAPON_BUSTER,
       .direction = direction,
       .damage = 2,

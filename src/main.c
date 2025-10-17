@@ -1,5 +1,6 @@
 // override raylib defaults
 
+#include "color.h"
 #include "enemy.h"
 #include "healthbar.h"
 #include "raylib.h"
@@ -52,11 +53,11 @@ int main(int argc, char *argv[]) {
   player.weapons[WEAPON_SPARK].active = true;
   player.weapons[WEAPON_RUSH_JET].active = true;
 
-  Enemy singleEnemy;
+  EnemyEntity singleEnemy;
   InitEnemy(&singleEnemy, (Vector2){75, 75}, enemySprite);
 
   // enemies
-  Enemy enemies[] = {singleEnemy};
+  EnemyEntity enemies[] = {singleEnemy};
 
   // add the 2D camera
   Camera2D camera = {0};
@@ -141,17 +142,22 @@ int main(int argc, char *argv[]) {
     CheckProjectileCollisions(&player.projectiles, bounds);
 
     for (int i = 0; i < 1; i++) {
-      UpdateEnemy(&enemies[i], player.moveable.position, deltaTime);
-      CheckPlayerHurt(&player, &enemies[i]);
+      UpdateEnemy(&enemies[i], &player, deltaTime);
+      if (enemies[i].active) {
+        CheckPlayerHurt(&player, enemies[i].hitbox);
+      }
+      CheckProjectileToEnemyCollisions(&enemies[i], &player.projectiles);
     }
 
     // update camera target
-    camera.target =
-        (Vector2){player.moveable.position.x, player.moveable.position.y};
+    camera.target = (Vector2){
+        player.moveable.position.x,
+        player.moveable.position.y,
+    };
 
     // Rendering functions
     BeginDrawing();
-    ClearBackground(RAYWHITE);
+    ClearBackground(COLOR_CORNFLOWER_BLUE);
 
     // start camera operations
     BeginMode2D(camera);
@@ -187,7 +193,7 @@ int main(int argc, char *argv[]) {
     DrawText("Use gamepad D-pad/left stick to move, A button to jump, Y "
              "button to run and X button to shoot",
              10, 10, 20, DARKGRAY);
-    DrawText("Keyboard: Arrow keys to move, Space to jump, Shift to run, C to "
+    DrawText("Keyboard: Arrow keys to move, Space to jump, C to "
              "cycle colors",
              10, 35, 20, DARKGRAY);
     // End Draw UI

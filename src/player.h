@@ -5,7 +5,6 @@
 #include "./platform.h"
 #include "./animation.h"
 #include "actions.h"
-#include "enemy.h"
 #include "fallable.h"
 #include "healthbar.h"
 #include "jumpable.h"
@@ -86,8 +85,8 @@ typedef struct {
     float                     shootingStateDelay;
     Color                     color;
     Texture2D                 sprite;
-    Texture2D                 projectileTexture;
     Vector2                   spriteOrigin;
+    Texture2D                 projectileTexture;
     PlayerState               state;
     bool                      facingRight;
     AnimationTimeline         timelines[PLAYER_TOTAL_STATES];
@@ -110,7 +109,7 @@ void         DrawPlayer(PlayerEntity player, bool debugMode);
 void         MovePlayer(PlayerEntity *player, float deltaTime);
 void         HandleJump(PlayerEntity *player, float deltaTime);
 void         HandleShooting(PlayerEntity *player, float deltaTime);
-void         CheckPlayerHurt(PlayerEntity *player, Enemy *enemy);
+void         CheckPlayerHurt(PlayerEntity *player, Rectangle hitbox);
 void         HurtPlayer(PlayerEntity *player, int damage);
 bool         IsPlayerStunned(PlayerEntity *player);
 Rectangle    GetPlayerPosition(PlayerEntity *player);
