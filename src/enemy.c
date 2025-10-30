@@ -6,7 +6,7 @@
 #include <raylib.h>
 #include <stdio.h>
 
-void InitEnemy(EnemyEntity *enemy, Vector2 position, Texture2D sprite) {
+void InitEnemy(EnemyEntity *enemy, Vector2 position, int textureId) {
   enemy->moveable = (MoveComponent){
       .position = position,
       .prevPosition = position,
@@ -16,7 +16,7 @@ void InitEnemy(EnemyEntity *enemy, Vector2 position, Texture2D sprite) {
   enemy->size = (Vector2){32.0f, 32.0f};
   enemy->rotation = 0.0f;
   enemy->rotationSpeed = 0.0f;
-  enemy->sprite = sprite;
+  enemy->textureId = textureId;
   enemy->spriteOrigin = (Vector2){enemy->size.x / 2, enemy->size.y / 2};
   enemy->hitbox = (Rectangle){
       position.x - enemy->size.x / 2,

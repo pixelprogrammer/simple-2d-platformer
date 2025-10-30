@@ -2,7 +2,6 @@
 #include "./screen.c"
 #include "actions.h"
 #include "animation.h"
-#include "enemy.h"
 #include "fallable.h"
 #include "healthbar.h"
 #include "screen.h"
@@ -43,7 +42,7 @@ AnimationTimeline GetCurrentAnimationTimeline(PlayerEntity *player) {
   return player->timelines[player->state];
 }
 
-void DrawPlayer(PlayerEntity player, bool debugMode) {
+void DrawPlayer(PlayerEntity player, Texture2D *texture, bool debugMode) {
   bool shouldDraw = true;
   if (player.stun.invincibilityTime > 0) {
     int iFrameTime = player.stun.invincibilityTime * 1000;
@@ -56,7 +55,7 @@ void DrawPlayer(PlayerEntity player, bool debugMode) {
 
   if (shouldDraw) {
 
-    if (player.sprite.id != 0) {
+    if (texture->id != 0) {
 
       AnimationTimeline timeline = GetCurrentAnimationTimeline(&player);
       Vector2 size = {timeline.frame.width, timeline.frame.height};
@@ -117,7 +116,7 @@ void DrawPlayer(PlayerEntity player, bool debugMode) {
                        SHADER_UNIFORM_FLOAT);
       }
 
-      DrawAnimatedSprite(&player.sprite, &timeline, drawPosition, size, origin,
+      DrawAnimatedSprite(texture, &timeline, drawPosition, size, origin,
                          player.facingRight);
 
       if (useShader) {
@@ -228,7 +227,7 @@ void ShootWeapon(PlayerEntity *player) {
       .y = player->moveable.position.y,
   };
 
-  SpawnProjectile(&player->projectiles, player->projectileTexture,
+  SpawnProjectile(&player->projectiles, player->projectileTextureId,
                   projectilePos, player->currentWeapon, direction);
   PlaySoundEffect(SOUND_SHOOT);
 
@@ -415,7 +414,7 @@ void CheckPlayerCollisions(PlayerEntity *player, Platform platforms[],
   }
 }
 
-PlayerEntity CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
+PlayerEntity CreatePlayer(int spriteTextureId, int projectileTextureId) {
   PlayerEntity player = {
       .moveable =
           {
@@ -477,8 +476,8 @@ PlayerEntity CreatePlayer(Texture2D sprite, Texture2D projectileTexture) {
       .canShoot = true,
       .shootingStateDelay = 0.0f,
       .color = BLUE,
-      .sprite = sprite,
-      .projectileTexture = projectileTexture,
+      .spriteTextureId = spriteTextureId,
+      .projectileTextureId = projectileTextureId,
       .currentWeapon = WEAPON_BUSTER,
       .weapons = CreateWeaponsArray(),
       .projectiles = {.length = 0},

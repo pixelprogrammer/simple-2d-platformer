@@ -52,13 +52,13 @@ void    RefillWeapons(Weapon *weapons[WEAPON_TOTAL]);
 void    DrawWeaponsBar(Weapon weapon);
 void    UpdateProjectile(Projectile *projectile, float deltaTime);
 void    UpdateProjectiles(ProjectileArray *projectileArray, float deltaTime);
-void    DrawProjectile(Projectile *projectile);
+void    DrawProjectile(Projectile *projectile, TextureLoader *loader);
 void    SpawnProjectile(
-       ProjectileArray *array, Texture2D texture, Vector2 position, WeaponType type, int direction);
+       ProjectileArray *array, int textureId, Vector2 position, WeaponType type, int direction);
 void DestroyProjectile(ProjectileArray *a, int projectileIndex);
 void CheckProjectileCollisions(ProjectileArray *a, Rectangle bounds);
 
 // create the different types of projectiles
-Projectile CreateBusterProjectile(Texture2D texture, Vector2 position, int direction);
+Projectile CreateBusterProjectile(int textureId, Vector2 position, int direction);
 
 #endif

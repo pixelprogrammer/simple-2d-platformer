@@ -1,6 +1,7 @@
 #include "weapons.h"
 #include "healthbar.h"
 #include "player.h"
+#include "sprite.h"
 #include <raylib.h>
 #include <raymath.h>
 
@@ -94,15 +95,20 @@ void CheckProjectileCollisions(ProjectileArray *a, Rectangle bounds) {
   }
 }
 
-void DrawProjectile(Projectile *projectile) { DrawSprite(projectile->sprite); }
+void DrawProjectile(Projectile *projectile, TextureLoader *loader) {
+  Texture2D texture =
+      GetTextureFromLoader(loader, projectile->sprite.textureId);
 
-Projectile CreateBusterProjectile(Texture2D texture, Vector2 position,
+  DrawSprite(projectile->sprite, &texture);
+}
+
+Projectile CreateBusterProjectile(int textureId, Vector2 position,
                                   int direction) {
 
   return (Projectile){
       .sprite =
           {
-              .texture = texture,
+              .textureId = textureId,
               .source =
                   (Rectangle){
                       .x = 0.0f,
@@ -137,7 +143,7 @@ Projectile CreateBusterProjectile(Texture2D texture, Vector2 position,
   };
 }
 
-void SpawnProjectile(ProjectileArray *a, Texture2D texture, Vector2 position,
+void SpawnProjectile(ProjectileArray *a, int textureId, Vector2 position,
                      WeaponType type, int direction) {
 
   if (a->length >= MAX_PROJECTILES) {
@@ -148,7 +154,7 @@ void SpawnProjectile(ProjectileArray *a, Texture2D texture, Vector2 position,
   switch (type) {
   case WEAPON_BUSTER:
   default:
-    newProjectile = CreateBusterProjectile(texture, position, direction);
+    newProjectile = CreateBusterProjectile(textureId, position, direction);
   }
 
   a->projectiles[a->length] = newProjectile;

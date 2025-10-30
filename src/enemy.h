@@ -14,7 +14,7 @@ typedef struct {
     Vector2          size;
     float            rotation;
     float            rotationSpeed;
-    Texture2D        sprite;
+    int              textureId;
     Vector2          spriteOrigin;
     Rectangle        hitbox;
     bool             active;
@@ -22,7 +22,7 @@ typedef struct {
     EnemyType        enemyType;
 } EnemyEntity;
 
-void  InitEnemy(EnemyEntity* enemy, Vector2 position, Texture2D sprite);
+void  InitEnemy(EnemyEntity* enemy, Vector2 position, int textureId);
 void  UpdateEnemy(EnemyEntity* enemy, PlayerEntity* player, float deltaTime);
 void  DrawEnemy(EnemyEntity enemy);
 bool  CheckEnemyCollision(EnemyEntity enemy, Rectangle other);

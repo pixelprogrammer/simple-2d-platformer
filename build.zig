@@ -36,6 +36,7 @@ pub fn build(b: *std.Build) void {
             "src/animation.c",
             "src/enemy.c",
             "src/fallable.c",
+            "src/game.c",
             "src/jumpable.c",
             "src/healthbar.c",
             "src/moveable.c",
